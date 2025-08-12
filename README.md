@@ -21,7 +21,12 @@ git clone https://github.com/HienNguyenVinh/Vietnam-Chatbot-History-using-Langgr
 - Sẽ có 1 thư mục chroma_db (2) trong thư mục content
 - Lấy hết các file trong thư mục chroma_db (2) và vất vào trong thư mục chroma_db (1)
 - Xóa thư mục content rỗng đi
-- Chạy file vector_search để test db
+- Chạy file test_db để test db
+```
+   cd db_helper
+   python test_db.py
+   cd ..
+```
 
 
 ## 1. Quy tắc đặt tên
