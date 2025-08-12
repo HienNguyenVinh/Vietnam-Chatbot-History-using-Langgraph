@@ -2,16 +2,26 @@
 
 ## Cài đặt
 ### Clone repo về máy
-
-
-### Nếu dùng pip, chạy lệnh sau trong terminal:
-```python
-pip install -r requirements.txt
 ```
-### Nếu dùng uv, chạy lệnh sau trong terminal:
-```python
-uv init
+git clone https://github.com/HienNguyenVinh/Vietnam-Chatbot-History-using-Langgraph
 ```
+### Cài thư viện cần thiết:
+-  Nếu dùng pip, chạy lệnh sau trong terminal:
+```python
+   pip install -r requirements.txt
+```
+-  Nếu dùng uv, chạy lệnh sau trong terminal:
+```python
+   uv init
+```
+
+### Extract database:
+- Unzip file chroma_db.zip trong file db_helper
+- Vào thư mục chroma_db (1) sau khi giải nén, vào tiếp trong thư mục content
+- Sẽ có 1 thư mục chroma_db (2) trong thư mục content
+- Lấy hết các file trong thư mục chroma_db (2) và vất vào trong thư mục chroma_db (1)
+- Xóa thư mục content rỗng đi
+- Chạy file vector_search để test db
 
 
 ## 1. Quy tắc đặt tên
