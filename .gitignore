@@ -9,3 +9,8 @@ wheels/
 # Virtual environments
 .venv
 .env
+env
+db_helper/chroma_db
+requirements_2.txt
+log.txt
+chroma_db

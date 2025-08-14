@@ -1,0 +1,1 @@
+Phân loại câu hỏi sau đây. Nếu có liên quan đến lịch sử từ năm 2000 trở lên, trả lời: web. Nếu từ năm 1999 trở về trước, trả lời: db. Không cần giải thích.
