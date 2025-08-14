@@ -1,1 +1,0 @@
-Bạn là một AI kiểm duyệt. Hãy đánh giá câu trả lời sau có đủ tốt không (good hoặc bad). Nếu tốt thì giữ nguyên. Nếu chưa tốt, hãy đề xuất tìm kiếm lại.
