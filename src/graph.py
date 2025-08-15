@@ -4,11 +4,10 @@ from langchain.tools import TavilySearchResults
 from dotenv import load_dotenv
 import os
 
-from sub_graph import rag_graph
+from src.sub_graph import rag_graph
 from src.states import AgentState
-from tools.web_search import WebSearch
-from models import LanguageModel
-from prompts import CLASSIFIER_SYSTEM_PROMPT, RESPONSE_SYSTEM_PROMPT, REFLECTION_PROMPT
+from src.models import LanguageModel
+from src.prompts import CLASSIFIER_SYSTEM_PROMPT, RESPONSE_SYSTEM_PROMPT, REFLECTION_PROMPT
 
 load_dotenv()
 
@@ -18,7 +17,8 @@ web_search_tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY)
 MAX_ITERATOR = 3
 
 # Tạo llm
-llm_model = LanguageModel()
+llm = LanguageModel(name_model="models/gemini-2.5-flash-lite-preview-06-17")
+llm_model = llm.model
 
 def classify_time(state: AgentState):
     """
@@ -123,4 +123,6 @@ builder.add_conditional_edges("reflect", event_loop)
 
 graph = builder.compile() 
 
-        
+# test
+output = graph.invoke({"user_input": "Năm 1304, có sự kiện gì xảy ra với Mạc Đĩnh Chi?"})
+print(output["final_answer"])        
