@@ -15,4 +15,4 @@ def load_config(file_path= Path(__file__).parent.parent / "config.yaml"):
 
 config = load_config()
 
-PATH_DB = Path(__file__).parent.parent + "db_helper/chroma_db" #Dường dẫn lên cơ sở dữ liệu
+PATH_DB = Path(__file__).parent.parent / "db_helper/chroma_db" #Dường dẫn lên cơ sở dữ liệu
