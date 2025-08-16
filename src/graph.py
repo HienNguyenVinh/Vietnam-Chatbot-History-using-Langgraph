@@ -4,14 +4,13 @@ from langchain.tools import TavilySearchResults
 from dotenv import load_dotenv
 import os
 
-from sub_graph import rag_graph
+from src.sub_graph import rag_graph
 from src.states import AgentState
-from tools.web_search import WebSearch
-from models import LanguageModel
-from prompts import CLASSIFIER_SYSTEM_PROMPT, RESPONSE_SYSTEM_PROMPT, REFLECTION_PROMPT
+from src.models import LanguageModel
+from src.prompts import CLASSIFIER_SYSTEM_PROMPT, RESPONSE_SYSTEM_PROMPT, REFLECTION_PROMPT
 from langgraph.checkpoint.sqlite import SqliteSaver
-from langchain.schema import HumanMessage
 import sqlite3
+
 load_dotenv()
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
@@ -19,8 +18,8 @@ web_search_tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY)
 
 MAX_ITERATOR = 3
 
-# Tạo llm
-llm_model = LanguageModel()
+llm = LanguageModel(name_model="models/gemini-2.5-flash-lite-preview-06-17")
+llm_model = llm.model
 
 def classify_time(state: AgentState):
     """
@@ -89,7 +88,6 @@ def reflect(state: AgentState):
         return {"reflect_result": revised, "state_graph": "bad"}
 
 conn = sqlite3.connect(database='chatbot.db', check_same_thread=False)
-# Checkpointer
 checkpointer = SqliteSaver(conn=conn)
 
 builder = StateGraph(AgentState)
@@ -112,15 +110,12 @@ builder.add_edge("aggregate", "reflect")
 
 
 def _get_num_iterations(state):
-    # length of state (loop)
     return len(state.get("history", []))
 
-# Define looping logic:
 def event_loop(state) -> str:
-    # in our case, we'll just stop after N plans
     num_iterations = _get_num_iterations(state)
     print(state)
-    if num_iterations > MAX_ITERATOR or state["state_graph"] == "good":
+    if num_iterations > MAX_ITERATOR or state.get("state_graph") == "good":
         return END
     return "search_web" if state["query_type"] == "web" else "search_db"
     
@@ -128,18 +123,5 @@ builder.add_conditional_edges("reflect", event_loop)
 
 graph = builder.compile() 
 
-# test
-# Configuration for threading or session context
-CONFIG = {'configurable': {'thread_id': 'thread-1'}}
-
-# Define the user message
-user_input = HumanMessage(content="Năm 1304, có sự kiện gì xảy ra với Mạc Đĩnh Chi?")
-
-# Invoke the chatbot with message and config
-response = graph.invoke(
-    {"messages": [user_input]},
-    config=CONFIG
-)
-
-# Output the response
-print(response.content)
+output = graph.invoke({"user_input": "Năm 1304, có sự kiện gì xảy ra với Mạc Đĩnh Chi?"})
+print(output["final_answer"])
