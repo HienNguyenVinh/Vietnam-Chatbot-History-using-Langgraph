@@ -9,7 +9,9 @@ from src.states import AgentState
 from tools.web_search import WebSearch
 from models import LanguageModel
 from prompts import CLASSIFIER_SYSTEM_PROMPT, RESPONSE_SYSTEM_PROMPT, REFLECTION_PROMPT
-
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langchain.schema import HumanMessage
+import sqlite3
 load_dotenv()
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
@@ -86,6 +88,9 @@ def reflect(state: AgentState):
     if "bad" in revised.lower():
         return {"reflect_result": revised, "state_graph": "bad"}
 
+conn = sqlite3.connect(database='chatbot.db', check_same_thread=False)
+# Checkpointer
+checkpointer = SqliteSaver(conn=conn)
 
 builder = StateGraph(AgentState)
 
@@ -123,4 +128,18 @@ builder.add_conditional_edges("reflect", event_loop)
 
 graph = builder.compile() 
 
-        
+# test
+# Configuration for threading or session context
+CONFIG = {'configurable': {'thread_id': 'thread-1'}}
+
+# Define the user message
+user_input = HumanMessage(content="Năm 1304, có sự kiện gì xảy ra với Mạc Đĩnh Chi?")
+
+# Invoke the chatbot with message and config
+response = graph.invoke(
+    {"messages": [user_input]},
+    config=CONFIG
+)
+
+# Output the response
+print(response.content)
