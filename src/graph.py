@@ -1,24 +1,25 @@
 from langgraph.graph import END, StateGraph
 from langchain.prompts import ChatPromptTemplate
 from langchain.tools import TavilySearchResults
+from langgraph.checkpoint.sqlite import SqliteSaver
 from dotenv import load_dotenv
 import os
+import sqlite3
 
 from src.sub_graph import rag_graph
-from src.states import AgentState
+from src.states import AgentState, InputState
 from src.models import LanguageModel
 from src.prompts import CLASSIFIER_SYSTEM_PROMPT, RESPONSE_SYSTEM_PROMPT, REFLECTION_PROMPT
-from langgraph.checkpoint.sqlite import SqliteSaver
-import sqlite3
+from utils.utils import config
 
 load_dotenv()
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-web_search_tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY)
-
 MAX_ITERATOR = 3
+MODEL_NAME = config["llm"]["gemini"]
 
-llm = LanguageModel(name_model="models/gemini-2.5-flash-lite-preview-06-17")
+web_search_tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY)
+llm = LanguageModel(name_model=MODEL_NAME)
 llm_model = llm.model
 
 def classify_time(state: AgentState):
@@ -43,15 +44,15 @@ def search_web(state: AgentState):
     query = state["user_input"]
     web_results = web_search_tool.invoke({"query": query})
     combined = "\n".join([r["content"] for r in web_results])
-    return {"result": combined}
+    return {"web_search_results": combined}
 
 def search_db(state: AgentState):
     """
     Searching db based on distance vector 
     """
     query = state["user_input"]
-    result = rag_graph.ainvoke(query)
-    return {"result": result}
+    result = rag_graph.ainvoke({"user_query": query})
+    return {"retrieved_documents": result}
 
 def aggregate(state: AgentState):
     """
@@ -90,7 +91,7 @@ def reflect(state: AgentState):
 conn = sqlite3.connect(database='chatbot.db', check_same_thread=False)
 checkpointer = SqliteSaver(conn=conn)
 
-builder = StateGraph(AgentState)
+builder = StateGraph(AgentState, input=InputState)
 
 builder.add_node("classify", classify_time)
 builder.add_node("search_web", search_web)

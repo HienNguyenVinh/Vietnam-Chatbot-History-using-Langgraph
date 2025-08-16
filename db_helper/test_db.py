@@ -121,3 +121,5 @@ for i, r in enumerate(results, 1):
     print(i, "distance:", r["distance"])
     print("file:", r["metadata"].get("file"), "chunk_index:", r["metadata"].get("chunk_index"))
     print(r["document"][:400].replace("\n", " "), "...\n")
+
+print(results)
