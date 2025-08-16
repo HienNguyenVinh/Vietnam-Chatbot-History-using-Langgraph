@@ -14,3 +14,7 @@ db_helper/chroma_db
 requirements_2.txt
 log.txt
 chroma_db
+db_helper
+.idea
+.python-version
+requirements.txt
