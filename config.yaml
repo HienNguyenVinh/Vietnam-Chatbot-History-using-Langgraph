@@ -1,9 +1,10 @@
 retriever:
   embedding_model: Qwen/Qwen3-Embedding-0.6B
   collection_name: viet_history
-  directory: ./chroma_db
+  db_path: db_helper/chroma_db
   top_k: 5
-  rerank_model: rerank-english-v3.0
+  rerank_model: mixedbread-ai/mxbai-rerank-base-v2
+  generate_query_model: gemini-2.0-flash
 llm:
   gemini: gemini-2.5-flash-lite
   temperature: 0
