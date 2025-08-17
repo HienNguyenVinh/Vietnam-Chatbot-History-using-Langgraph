@@ -3,8 +3,8 @@ from langchain.prompts import ChatPromptTemplate
 import re
 from typing import Dict, Any
 
-from .reflection_states import ReflectionState
-from .reflection_prompts import REFLECTION_EVALUATION_PROMPT, IMPROVEMENT_FEEDBACK_PROMPT
+from .states import ReflectionState
+from src.prompts import REFLECTION_PROMPT, IMPROVEMENT_FEEDBACK_PROMPT
 from ..models import LanguageModel
 
 # Initialize LLM
@@ -22,7 +22,7 @@ def evaluate_answer(state: ReflectionState) -> Dict[str, Any]:
     
     try:
         prompt = ChatPromptTemplate.from_messages([
-            ("system", REFLECTION_EVALUATION_PROMPT),
+            ("system", REFLECTION_PROMPT),
             ("human", "Câu hỏi: {query}\n\nCâu trả lời: {answer}")
         ])
         

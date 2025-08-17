@@ -1,27 +1,29 @@
 from langgraph.graph import END, StateGraph
 from langchain.prompts import ChatPromptTemplate
-from langchain.tools import TavilySearchResults
+from langchain_community.tools import TavilySearchResults
+from langgraph.checkpoint.sqlite import SqliteSaver
 from dotenv import load_dotenv
 import os
+import sqlite3
+from typing import Dict, Any, List
 
 from src.sub_graph import ReflectionState
 from src.sub_graph import rag_graph, reflection_graph
-from src.states import AgentState
+from src.states import AgentState, InputState
 from src.models import LanguageModel
 from src.prompts import CLASSIFIER_SYSTEM_PROMPT, RESPONSE_SYSTEM_PROMPT
-
+from src.utils.utils import config
 load_dotenv()
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-web_search_tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY)
-
 MAX_ITERATOR = 3
+MODEL_NAME = config["llm"]["gemini"]
 
-# Tạo llm
-llm = LanguageModel(name_model="models/gemini-2.5-flash-lite-preview-06-17")
+web_search_tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY)
+llm = LanguageModel(name_model=MODEL_NAME)
 llm_model = llm.model
 
-def classify_time(state: AgentState):
+async def classify_time(state: AgentState) -> Dict[str, str]:
     """
     Classify year to search 2000+ or 2000-
     """
@@ -32,44 +34,44 @@ def classify_time(state: AgentState):
         ("human", "{query}")
     ])
     chain = prompt | llm_model
-    result = chain.invoke({"query": user_input}).content.strip().lower()
+    result = chain.ainvoke({"query": user_input}).content.strip().lower()
 
     return {"query_type": "web" if "web" in result else "db"}
 
-def search_web(state: AgentState):
+async def search_web(state: AgentState) -> Dict[str, Any]:
     """
     Searching web
     """
     query = state["user_input"]
     web_results = web_search_tool.invoke({"query": query})
     combined = "\n".join([r["content"] for r in web_results])
-    return {"result": combined}
+    return {"web_search_results": combined}
 
-def search_db(state: AgentState):
+async def search_db(state: AgentState) -> Dict[str, Any]:
     """
     Searching db based on distance vector 
     """
     query = state["user_input"]
-    result = rag_graph.ainvoke(query)
-    return {"result": result}
+    result = rag_graph.ainvoke({"user_query": query})
+    return {"retrieved_documents": result}
 
-def aggregate(state: AgentState):
+async def aggregate(state: AgentState) -> Dict[str, str]:
     """
     generate final answer rely on query and extral data - searched on web or db
     """
     query = state["user_input"]
-    result = state["result"]
+    result = state["retrieved_documents"]
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", RESPONSE_SYSTEM_PROMPT),
         ("human", "Query: {query}\n\nResults:\n{result}")
     ])
     chain = prompt | llm_model
-    answer = chain.invoke({"query": query, "result": result}).content
+    answer = chain.ainvoke({"query": query, "result": result}).content
 
     return {"final_answer": answer}
 
-def reflect(state: AgentState):
+async def reflect(state: AgentState):
     """
     Enhanced reflection using the reflection sub-graph
     """
@@ -115,8 +117,10 @@ def reflect(state: AgentState):
     
     return updated_state
 
+conn = sqlite3.connect(database='chatbot.db', check_same_thread=False)
+checkpointer = SqliteSaver(conn=conn)
 
-builder = StateGraph(AgentState)
+builder = StateGraph(AgentState, input=InputState)
 
 builder.add_node("classify", classify_time)
 builder.add_node("search_web", search_web)
@@ -136,42 +140,15 @@ builder.add_edge("aggregate", "reflect")
 
 
 def _get_num_iterations(state):
-    # length of state (loop)
     return len(state.get("history", []))
 
-# Define looping logic:
 def event_loop(state) -> str:
-    # in our case, we'll just stop after N plans
     num_iterations = _get_num_iterations(state)
     print(state)
-    if num_iterations > MAX_ITERATOR or state["state_graph"] == "good":
+    if num_iterations > MAX_ITERATOR or state.get("state_graph") == "good":
         return END
     return "search_web" if state["query_type"] == "web" else "search_db"
     
 builder.add_conditional_edges("reflect", event_loop)
 
 graph = builder.compile() 
-
-if __name__ == "__main__":
-    print("🧪 Testing Enhanced Reflection System with Sub-Graph")
-    print("=" * 60)
-    
-    test_query = "Năm 1304, có sự kiện gì xảy ra với Mạc Đĩnh Chi?"
-    print(f"Query: {test_query}")
-    print("-" * 60)
-    
-    output = graph.invoke({"user_input": test_query})
-    
-    print("\n📝 Final Answer:")
-    print(output.get("final_answer", "No answer generated"))
-    
-    print("\n📊 Reflection Results:")
-    print(f"Final Evaluation: {output.get('final_evaluation', 'N/A')}")
-    print(f"Final Score: {output.get('final_score', 'N/A')}/10")
-    print(f"Reflection: {output.get('reflect_result', 'N/A')}")
-    
-    print("\n🔄 Iteration History:")
-    for i, hist in enumerate(output.get("history", []), 1):
-        print(f"  {i}. Score: {hist['score']}/10 - {hist['evaluation']}")
-        if hist.get('reasoning'):
-            print(f"     Reasoning: {hist['reasoning'][:100]}...")   

@@ -2,6 +2,7 @@ import numpy as np
 import chromadb
 from typing import Optional, Any, Dict, List
 from sentence_transformers import SentenceTransformer
+from pathlib import Path
 
 def vector_search_chroma(
     collection,
@@ -94,30 +95,31 @@ def vector_search_chroma(
             "metadata": md,
             "distance": dist
         })
-
     return results
 
-# print("___________Start_____________")
-# client = chromadb.PersistentClient(path="db_helper/chroma_db")
-# # print(client.list_collections())
-# collection = client.get_collection("viet_history")
-# print("___________get db success__________")
+print("___________Start_____________")
+client = chromadb.PersistentClient(path=Path(__file__).parent / "chroma_db")
+print(client.list_collections())
+collection = client.get_collection("viet_history")
+print("___________get db success__________")
 
-# embedder = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
-# print("___________get embedding model success_________")
+embedder = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
+print("___________get embedding model success_________")
 
-# print("___________searching____________")
-# query = "Năm 1304, có sự kiện gì xảy ra với Mạc Đĩnh Chi?"
-# results = vector_search_chroma(
-#     collection=collection,
-#     query=query,
-#     embedder=embedder,
-#     top_k=5,
-#     where={"category": "Lich_Su_Chung"}
-# )
+print("___________searching____________")
+query = "Năm 1304, có sự kiện gì xảy ra với Mạc Đĩnh Chi?"
+results = vector_search_chroma(
+    collection=collection,
+    query=query,
+    embedder=embedder,
+    top_k=5,
+    where={"category": "Lich_Su_Chung"}
+)
 
-# print(type(results))
-# for i, r in enumerate(results, 1):
-#     print(i, "distance:", r["distance"])
-#     print("file:", r["metadata"].get("file"), "chunk_index:", r["metadata"].get("chunk_index"))
-#     print(r["document"][:400].replace("\n", " "), "...\n")
+print(type(results))
+for i, r in enumerate(results, 1):
+    print(i, "distance:", r["distance"])
+    print("file:", r["metadata"].get("file"), "chunk_index:", r["metadata"].get("chunk_index"))
+    print(r["document"][:400].replace("\n", " "), "...\n")
+
+print(results)
