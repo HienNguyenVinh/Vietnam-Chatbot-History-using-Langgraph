@@ -1,14 +1,19 @@
-# Viết RAG trong này
 from typing import List, Any, Dict, TypedDict, cast
 from chromadb import PersistentClient
 from sentence_transformers import SentenceTransformer
 from langgraph.graph import START, END, StateGraph
+from langchain_core.documents import Document
 from langchain_google_genai import ChatGoogleGenerativeAI
 from mxbai_rerank import MxbaiRerankV2
+import asyncio
+import logging
+from dotenv import load_dotenv
 
-from utils.utils import config
-from src.sub_graph.states import State
-from prompts import GENERATE_QUERY_SYSTEM_PROMPT
+from ..utils.utils import config
+from .states import State
+from .prompts import GENERATE_QUERY_SYSTEM_PROMPT
+
+load_dotenv()
 
 EMBEDDING_MODEL = config["retriever"]["embedding_model"]
 RERANK_MODEL = config["retriever"]["rerank_model"]
@@ -18,40 +23,107 @@ TOP_K = config["retriever"]["top_k"]
 COLLECTION_NAME = config["retriever"]["collection_name"]
 DB_PATH = config["retriever"]["db_path"]
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class Query(TypedDict):
     vector_search_query : str
     category: str
-    relative_path: List[str]
 
     bm25_search_keyword: str
 
-
-def generate_query(state: State):
+async def generate_query(state: State) -> Dict[str, str]:
+    logger.info("___generating queries...")
     model = ChatGoogleGenerativeAI(model=GENERATE_QUERY_MODEL)
     messages=[
         {"role": "system", "content": GENERATE_QUERY_SYSTEM_PROMPT},
-        {"role": "human", "content": state.user_query}
+        {"role": "human", "content": state["user_query"]}
     ]
 
     response = cast(Query, await model.with_structured_output(Query).ainvoke(messages))
+    logger.infor(f"___generated queries: {response}")
 
     return response
 
-def retrieval(state: State):
+async def vector_search(query: str, category: str) -> List[Document]:
     client = PersistentClient(path=DB_PATH)
-    collection = client.get_collection(COLLECTION_NAME)
-    model = SentenceTransformer(EMBEDDING_MODEL)
-    embedding = model.encode([state['query']], convert_to_numpy=True)
+    try:
+        collection = client.get_collection(COLLECTION_NAME)
+        model = SentenceTransformer(EMBEDDING_MODEL)
 
-    result = collection.query(
-        query_embeddings=embedding.tolist(),
-        n_results=TOP_K,
+        embedding = model.encode(query, convert_to_numpy=True)
+        include = ["metadatas", "documents", "distances"]
+
+        where = {}
+        where["category"] = category
+
+        results = collection.query(
+            query_embeddings=[embedding.tolist()],
+            n_results=TOP_K,
+            where=where,
+            include=include
+        )
+
+        docs = results.get("documents", [[]])[0]
+        metadatas = results.get("metadatas", [[]])[0]
+        distances = results.get("distances", [[]])[0]
+        ids = results.get("ids", [[]])[0] if "ids" in results else [None] * len(docs)
+
+        documents: List[Document] = []
+        for _id, doc_text, md, dist in zip(ids, docs, metadatas, distances):
+            metadata = {}
+            if isinstance(md, dict):
+                metadata.update(md)
+            else:
+                metadata["raw_metadata"] = md
+
+            if _id is not None:
+                metadata.setdefault("id", _id)
+            metadata["distance"] = dist
+
+            doc = Document(page_content=doc_text, metadata=metadata)
+            documents.append(doc)
+
+        return documents
+
+    finally:
+        try:
+            client.persist()
+        except Exception:
+            pass
+
+# Viết hàm bm25 search
+# Dùng thư viện from langchain_community.retrievers import BM25Retriever
+# Ec ec ec
+async def bm25_search(bm25_search_keyword: str) -> List[Document]:
+    return None
+
+async def hybrid_search(state: State) -> Dict[Any, Any]:
+    logger.info("___start searching...")
+    results = await asyncio.gather(
+        vector_search(state.vector_search_query, state.category),
+        bm25_search(state.bm25),
+        return_exceptions=True
     )
+    logger.info("___finished searching...")
 
-    return {
-        'retrieved_documents': result
-    }
+    vector_results, bm25_results = results
+    if isinstance(vector_results, Exception):
+        logger.error("Vector search failed", exc_info=vector_results)
+        vector_results = []
+    if isinstance(bm25_results, Exception):
+        logger.error("Full-text search failed", exc_info=bm25_results)
+        bm25_results = []
+
+    seen = set()
+    combined: List[dict] = []
+    for doc in vector_results + bm25_results:
+        uid = doc.metadata.get("name")
+        if uid and uid not in seen:
+            combined.append(doc)
+            seen.add(uid)
+
+    return {"retrieved_products": combined}
 
 def _format_documents(documents: List[Dict[str, Any]]):
     results = []
@@ -60,7 +132,8 @@ def _format_documents(documents: List[Dict[str, Any]]):
     
     return results
 
-def rerank(state: State):
+async def rerank(state: State) -> Dict[str, List[any]]:
+    logger.info("___start reranking...")
     model = MxbaiRerankV2(RERANK_MODEL)
     query = state.user_query
     documents = _format_documents(state.retrieved_documents)
@@ -69,25 +142,26 @@ def rerank(state: State):
         results = model.rerank(query, documents, return_documents=True, top_k=5)
     except Exception as e:
         results = state.retrieved_documents
-    
+    logger.info("___finished reranking...")
+
     return {"retrieved_documents": results}
 
 builder = StateGraph(State)
 
 builder.add_node("generate_query", generate_query)
-builder.add_node("retrieval", retrieval)
+builder.add_node("hybrid_search", hybrid_search)
 builder.add_node("rerank", rerank)
 
 builder.add_edge(START, "generate_query")
-builder.add_edge("generate_query", "retrieval")
-builder.add_edge("retrieval", "rerank")
+builder.add_edge("generate_query", "hybrid_search")
+builder.add_edge("hybrid_search", "rerank")
 builder.add_edge("rerank", END)
 
 graph = builder.compile()
 
 
 if __name__ == '__main__':
-    result = graph.invoke({})
+    result = graph.invoke({"user_query": "Hồ Quý Ly đã làm gì?"})
     print(result['output'])
 
 

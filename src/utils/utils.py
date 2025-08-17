@@ -5,7 +5,7 @@ from pathlib import Path
 def new_uuid():
     return str(uuid.uuid4())
 
-def load_config(file_path= Path(__file__).parent.parent / "config.yaml"):
+def load_config(file_path= "./config.yaml"):
     """
     Loads the configuration from the YAML file.
     """
