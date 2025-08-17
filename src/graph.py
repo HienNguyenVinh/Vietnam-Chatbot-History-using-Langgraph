@@ -4,10 +4,11 @@ from langchain.tools import TavilySearchResults
 from dotenv import load_dotenv
 import os
 
-from src.sub_graph import rag_graph
+from src.sub_graph import ReflectionState
+from src.sub_graph import rag_graph, reflection_graph
 from src.states import AgentState
 from src.models import LanguageModel
-from src.prompts import CLASSIFIER_SYSTEM_PROMPT, RESPONSE_SYSTEM_PROMPT, REFLECTION_PROMPT
+from src.prompts import CLASSIFIER_SYSTEM_PROMPT, RESPONSE_SYSTEM_PROMPT
 
 load_dotenv()
 
@@ -70,21 +71,49 @@ def aggregate(state: AgentState):
 
 def reflect(state: AgentState):
     """
-    Comment the final result and return advices
+    Enhanced reflection using the reflection sub-graph
     """
-    answer = state["final_answer"]
     query = state["user_input"]
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", REFLECTION_PROMPT),
-        ("human", "Câu hỏi: {query}\nTrả lời: {answer}")
-    ])
-    chain = prompt | llm_model
-    revised = chain.invoke({"query": query, "answer": answer}).content
-    if "good" in revised.lower():
-        return {"reflect_result": revised, "state_graph": "good"}
-    if "bad" in revised.lower():
-        return {"reflect_result": revised, "state_graph": "bad"}
+    answer = state["final_answer"]
+    iteration = _get_num_iterations(state)
+    
+    # Initialize history if not exists
+    if "history" not in state:
+        state["history"] = []
+    
+    # Prepare reflection state
+    reflection_state = ReflectionState(
+        query=query,
+        answer=answer,
+        iteration=iteration,
+        history=state["history"],
+        evaluation=None,
+        score=None,
+        reasoning=None,
+        suggestions=None,
+        improvement_feedback=None,
+        should_continue=False,
+        final_decision="end"
+    )
+    
+    # Run reflection sub-graph
+    reflection_result = reflection_graph.invoke(reflection_state)
+    
+    # Update main state with reflection results
+    updated_state = {
+        "reflect_result": f"Evaluation: {reflection_result['evaluation']} (Score: {reflection_result['score']}/10)",
+        "history": reflection_result["history"],
+        "state_graph": "good" if reflection_result["final_decision"] == "end" else "bad"
+    }
+    
+    # Add improvement feedback if continuing
+    if reflection_result["should_continue"]:
+        updated_state["improvement_feedback"] = reflection_result.get("improvement_feedback", "")
+    else:
+        updated_state["final_score"] = reflection_result["score"]
+        updated_state["final_evaluation"] = reflection_result["evaluation"]
+    
+    return updated_state
 
 
 builder = StateGraph(AgentState)
@@ -123,6 +152,26 @@ builder.add_conditional_edges("reflect", event_loop)
 
 graph = builder.compile() 
 
-# test
-output = graph.invoke({"user_input": "Năm 1304, có sự kiện gì xảy ra với Mạc Đĩnh Chi?"})
-print(output["final_answer"])        
+if __name__ == "__main__":
+    print("🧪 Testing Enhanced Reflection System with Sub-Graph")
+    print("=" * 60)
+    
+    test_query = "Năm 1304, có sự kiện gì xảy ra với Mạc Đĩnh Chi?"
+    print(f"Query: {test_query}")
+    print("-" * 60)
+    
+    output = graph.invoke({"user_input": test_query})
+    
+    print("\n📝 Final Answer:")
+    print(output.get("final_answer", "No answer generated"))
+    
+    print("\n📊 Reflection Results:")
+    print(f"Final Evaluation: {output.get('final_evaluation', 'N/A')}")
+    print(f"Final Score: {output.get('final_score', 'N/A')}/10")
+    print(f"Reflection: {output.get('reflect_result', 'N/A')}")
+    
+    print("\n🔄 Iteration History:")
+    for i, hist in enumerate(output.get("history", []), 1):
+        print(f"  {i}. Score: {hist['score']}/10 - {hist['evaluation']}")
+        if hist.get('reasoning'):
+            print(f"     Reasoning: {hist['reasoning'][:100]}...")   
