@@ -37,11 +37,11 @@ async def generate_query(state: State) -> Dict[str, str]:
     model = ChatGoogleGenerativeAI(model=GENERATE_QUERY_MODEL)
     messages=[
         {"role": "system", "content": GENERATE_QUERY_SYSTEM_PROMPT},
-        {"role": "human", "content": state["user_query"]}
+        {"role": "human", "content": state.user_query}
     ]
 
     response = cast(Query, await model.with_structured_output(Query).ainvoke(messages))
-    logger.infor(f"___generated queries: {response}")
+    logger.info(f"___generated queries: {response}")
 
     return response
 
@@ -80,8 +80,8 @@ async def vector_search(query: str, category: str) -> List[Document]:
             if _id is not None:
                 metadata.setdefault("id", _id)
             metadata["distance"] = dist
-
             doc = Document(page_content=doc_text, metadata=metadata)
+
             documents.append(doc)
 
         return documents
@@ -96,13 +96,13 @@ async def vector_search(query: str, category: str) -> List[Document]:
 # Dùng thư viện from langchain_community.retrievers import BM25Retriever
 # Ec ec ec
 async def bm25_search(bm25_search_keyword: str) -> List[Document]:
-    return None
+    return []
 
 async def hybrid_search(state: State) -> Dict[Any, Any]:
     logger.info("___start searching...")
     results = await asyncio.gather(
         vector_search(state.vector_search_query, state.category),
-        bm25_search(state.bm25),
+        bm25_search(state.bm25_search_keyword),
         return_exceptions=True
     )
     logger.info("___finished searching...")
@@ -115,20 +115,22 @@ async def hybrid_search(state: State) -> Dict[Any, Any]:
         logger.error("Full-text search failed", exc_info=bm25_results)
         bm25_results = []
 
+    logger.info(f"___vector search results: {len(vector_results)}...")
+    logger.info(f"___bm25 search results: {len(bm25_results)}...")
     seen = set()
-    combined: List[dict] = []
+    combined: List[Any] = []
     for doc in vector_results + bm25_results:
-        uid = doc.metadata.get("name")
+        uid = doc.metadata.get("relative_path")
         if uid and uid not in seen:
             combined.append(doc)
             seen.add(uid)
+    # print(combined)
+    return {"retrieved_documents": combined}
 
-    return {"retrieved_products": combined}
-
-def _format_documents(documents: List[Dict[str, Any]]):
+def _format_documents(documents: List[Document]):
     results = []
     for doc in documents:
-        results.append(doc['document'])
+        results.append(doc.page_content)
     
     return results
 
@@ -142,8 +144,9 @@ async def rerank(state: State) -> Dict[str, List[any]]:
         results = model.rerank(query, documents, return_documents=True, top_k=5)
     except Exception as e:
         results = state.retrieved_documents
-    logger.info("___finished reranking...")
 
+    logger.info("___finished reranking...")
+    print(results)
     return {"retrieved_documents": results}
 
 builder = StateGraph(State)

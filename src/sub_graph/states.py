@@ -1,17 +1,16 @@
 from typing import TypedDict, Any, Optional, List, Dict
-from dataclasses import  dataclass
+from dataclasses import  dataclass, field
+from langchain_core.documents import Document
 
 @dataclass(kw_only=True)
-class State(TypedDict):
-    user_query: Optional[str]
+class State():
+    user_query: Optional[str] = None
     
-    vector_search_query : Optional[str]
-    category: Optional[str]
-    relative_path: Optional[List[str]]
+    vector_search_query : Optional[str] = None
+    category: Optional[str] = None
+    bm25_search_keyword: Optional[str] = None
 
-    bm25_search_keyword: Optional[str]
-
-    retrieved_documents: Optional[List[Dict[str, Any]]]
+    retrieved_documents: List[Document] = field(default_factory=list)
     
 @dataclass(kw_only=True)
 class ReflectionState(TypedDict):
