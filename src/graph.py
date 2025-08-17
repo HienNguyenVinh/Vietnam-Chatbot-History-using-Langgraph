@@ -5,6 +5,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from dotenv import load_dotenv
 import os
 import sqlite3
+from typing import Dict, Any, List
 
 from src.sub_graph import rag_graph
 from src.states import AgentState, InputState
@@ -22,7 +23,7 @@ web_search_tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY)
 llm = LanguageModel(name_model=MODEL_NAME)
 llm_model = llm.model
 
-def classify_time(state: AgentState):
+async def classify_time(state: AgentState) -> Dict[str, str]:
     """
     Classify year to search 2000+ or 2000-
     """
@@ -33,11 +34,11 @@ def classify_time(state: AgentState):
         ("human", "{query}")
     ])
     chain = prompt | llm_model
-    result = chain.invoke({"query": user_input}).content.strip().lower()
+    result = chain.ainvoke({"query": user_input}).content.strip().lower()
 
     return {"query_type": "web" if "web" in result else "db"}
 
-def search_web(state: AgentState):
+async def search_web(state: AgentState) -> Dict[str, Any]:
     """
     Searching web
     """
@@ -46,7 +47,7 @@ def search_web(state: AgentState):
     combined = "\n".join([r["content"] for r in web_results])
     return {"web_search_results": combined}
 
-def search_db(state: AgentState):
+async def search_db(state: AgentState) -> Dict[str, Any]:
     """
     Searching db based on distance vector 
     """
@@ -54,23 +55,23 @@ def search_db(state: AgentState):
     result = rag_graph.ainvoke({"user_query": query})
     return {"retrieved_documents": result}
 
-def aggregate(state: AgentState):
+async def aggregate(state: AgentState) -> Dict[str, str]:
     """
     generate final answer rely on query and extral data - searched on web or db
     """
     query = state["user_input"]
-    result = state["result"]
+    result = state["retrieved_documents"]
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", RESPONSE_SYSTEM_PROMPT),
         ("human", "Query: {query}\n\nResults:\n{result}")
     ])
     chain = prompt | llm_model
-    answer = chain.invoke({"query": query, "result": result}).content
+    answer = chain.ainvoke({"query": query, "result": result}).content
 
     return {"final_answer": answer}
 
-def reflect(state: AgentState):
+async def reflect(state: AgentState):
     """
     Comment the final result and return advices
     """
@@ -82,7 +83,8 @@ def reflect(state: AgentState):
         ("human", "Câu hỏi: {query}\nTrả lời: {answer}")
     ])
     chain = prompt | llm_model
-    revised = chain.invoke({"query": query, "answer": answer}).content
+    revised = chain.ainvoke({"query": query, "answer": answer}).content
+    
     if "good" in revised.lower():
         return {"reflect_result": revised, "state_graph": "good"}
     if "bad" in revised.lower():
