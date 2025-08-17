@@ -46,7 +46,6 @@ def generate_query(data: State):
         data: Gồm câu hỏi người dùng và lịch sử trò truyện
 
     Returns: Câu hỏi độc lập
-
     '''
     chat = llm()  # Khởi tạo LLM (Google Generative AI) với model đã config
     input = data['input']  # Lấy câu hỏi đầu vào từ người dùng
@@ -94,6 +93,7 @@ def retrieval(data: State):
         query_embeddings=embedding.tolist(),  # chuyển numpy array → list
         n_results=TOP_K  # Số lượng vector gần nhất(so với suy vấn) cần lấy
     )
+    print(result['distances'])
     # Trả về kết quả tìm kiếm (result chứa documents, embeddings, distances, ids...)
     return {
         'result': result
@@ -104,7 +104,8 @@ def retrieval(data: State):
 def rerank(data: State):
     documents = data['result']['documents']
     distances = data['result']['distances']
-    return {'output': documents[distances.index(max(distances))]}
+    best_index = distances.index(min(distances))
+    return {'output': documents[best_index]}
     pass
 
 
