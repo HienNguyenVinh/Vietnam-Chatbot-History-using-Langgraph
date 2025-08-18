@@ -18,7 +18,7 @@ class AgentState(InputState):
     final_answer: Optional[str] = None # final result for user
     reflect_result: Optional[str] = None # result of reflection - comment of "teacher"
     state_graph: Literal["good", "bad"] = "bad" # summerization of these comments - good or bad
-    history: Optional[List[Dict[str, Any]]]  # history of iterations and evaluations
-    improvement_feedback: Optional[str]      # feedback for improvement
-    final_score: Optional[int]               # final evaluation score
-    final_evaluation: Optional[str]          # final evaluation result
+    history: Optional[List[Dict[str, Any]]] = field(default_factory=list)  # history of iterations and evaluations
+    improvement_feedback: Optional[str] = None     # feedback for improvement
+    final_score: Optional[int] = None              # final evaluation score
+    final_evaluation: Optional[str] = None          # final evaluation result

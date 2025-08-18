@@ -1,4 +1,7 @@
-CLASSIFIER_SYSTEM_PROMPT = """Phân loại câu hỏi sau đây. Nếu có liên quan đến lịch sử từ năm 2000 trở lên, trả lời: web. Nếu từ năm 1999 trở về trước, trả lời: db. Không cần giải thích."""
+CLASSIFIER_SYSTEM_PROMPT = """Phân loại câu hỏi sau đây:
+- Nếu câu hỏi liên quan đến lịch sử Việt Nam từ năm 1999 trở về trước (2000-), trả lời: history
+- Nếu câu hỏi liên quan đến các sự kiện từ năm 2000 trở lên (2000+) hoặc là trò chuyện thường ngày, trả lời: chitchat
+Không cần giải thích."""
 
 RESPONSE_SYSTEM_PROMPT = """
 Dựa trên kết quả dưới đây, hãy trả lời truy vấn một cách ngắn gọn và chính xác.
