@@ -12,8 +12,8 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 class LanguageModel():
     def __init__(self, name_model, 
-                 temperature = 0.3, 
-                 top_p = 0.8, 
+                 temperature = 0, 
+                 top_p = 0.9, 
                  openai_api_base=OPENAI_API_BASE, 
                  openai_api_key=OPENAI_API_KEY, 
                  model_type = "GEMINI"
