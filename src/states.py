@@ -3,11 +3,11 @@ from langgraph.graph import add_messages
 from langchain_core.messages import AnyMessage
 from dataclasses import dataclass, field
 
-@dataclass
-class InputState():
+# @dataclass
+class InputState(TypedDict):
     messages: Annotated[List[AnyMessage], add_messages]
 
-@dataclass(kw_only=True)
+# @dataclass(kw_only=True)
 class AgentState(InputState):
     user_input: Optional[str] = None
     query_type: Literal["web", "db"] = None

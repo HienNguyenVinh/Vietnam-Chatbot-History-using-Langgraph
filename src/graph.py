@@ -35,11 +35,11 @@ async def classify_time(state: AgentState) -> Dict[str, str]:
     Classify year to search 2000+ or 2000-
     """
     logging.info("---ANALYZE AND ROUTE QUERY---")
-    logging.info(f"MESSAGES: {state.messages}")
+    logging.info(f"MESSAGES: {state['messages']}")
     messages = [
         {"role": "system", "content": CLASSIFIER_SYSTEM_PROMPT},
-    ] + state.messages
-    user_input = state.messages[-1].content
+    ] + state["messages"]
+    user_input = state["messages"][-1].content
 
     response = cast(Router, await llm_model.with_structured_output(Router).ainvoke(messages))
     logging.info(f"ROUTER TO {response}")
@@ -47,19 +47,19 @@ async def classify_time(state: AgentState) -> Dict[str, str]:
     return {"query_type": response["query_type"], "user_input": user_input}
 
 def router_query(state: AgentState) -> Literal["search_web", "search_db"]:
-    if state.query_type == "db":
+    if state["query_type"] == "db":
         return "search_db"
-    elif state.query_type == "web":
+    elif state["query_type"] == "web":
         return "search_web"
     else:
-        raise ValueError(f"Unknown router type: {state.router}")
+        raise ValueError(f"Unknown router type: {state['router']}")
 
 async def search_web(state: AgentState) -> Dict[str, Any]:
     """
     Searching web
     """
     logging.info(f"---START SEARCH WEB---")
-    web_results = web_search_tool.invoke({"query": state.user_input})
+    web_results = web_search_tool.invoke({"query": state['user_input']})
     combined = "\n".join([r["content"] for r in web_results])
     logging.info(f"---SEARCH WEB DONE---")
 
@@ -70,7 +70,7 @@ async def search_db(state: AgentState) -> List[Any]:
     Searching db based on distance vector 
     """
     logging.info(f"---START RAG---")
-    result = await rag_graph.ainvoke({"user_query": state.user_input})
+    result = await rag_graph.ainvoke({"user_query": state['user_input']})
     logging.info(f"---RAG DONE---")
     return {"retrieved_documents": result["retrieved_documents"]}
 
@@ -85,14 +85,14 @@ async def aggregate(state: AgentState) -> Dict[str, str]:
     """
     generate final answer rely on query and extral data - searched on web or db
     """
-    if state.query_type == 'db':
-        prompt = RESPONSE_SYSTEM_PROMPT + "\nRETRIEVED DOCUMENTS:\n" + _format_documents(state.retrieved_documents)
+    if state["query_type"] == 'db':
+        prompt = RESPONSE_SYSTEM_PROMPT + "\nRETRIEVED DOCUMENTS:\n" + _format_documents(state['retrieved_documents'])
     else:
-        prompt = RESPONSE_SYSTEM_PROMPT + "\nRETRIEVED DOCUMENTS:\n" + state.web_search_results
+        prompt = RESPONSE_SYSTEM_PROMPT + "\nRETRIEVED DOCUMENTS:\n" + state['web_search_results']
 
     messages = [
         {"role": "system", "content": prompt},
-    ] + state.messages
+    ] + state["messages"]
 
     answer = await llm_model.ainvoke(messages)
 
@@ -102,8 +102,8 @@ async def reflect(state: AgentState):
     """
     Comment the final result and return advices
     """
-    answer = state.final_answer
-    query = state.user_input
+    answer = state['final_answer']
+    query = state['user_input']
 
     messages = [
         {"role": "system", "content": REFLECTION_PROMPT},
@@ -112,9 +112,9 @@ async def reflect(state: AgentState):
 
     revised = await llm_model.ainvoke(messages)
     
-    if "good" in revised.lower():
+    if "good" in revised.content.lower():
         return {"reflect_result": revised, "state_graph": "good"}
-    if "bad" in revised.lower():
+    if "bad" in revised.content.lower():
         return {"reflect_result": revised, "state_graph": "bad"}
 
 
@@ -157,12 +157,12 @@ builder.add_edge("aggregate", "reflect")
 
 
 def _get_num_iterations(state):
-    return len(state.get("history", []))
+    return len(state["messages"])
 
 def event_loop(state) -> str:
     num_iterations = _get_num_iterations(state)
     print(state)
-    if num_iterations > MAX_ITERATOR or state.get("state_graph") == "good":
+    if num_iterations > MAX_ITERATOR or state['state_graph'] == "good":
         return END
     return "search_web" if state["query_type"] == "web" else "search_db"
     
