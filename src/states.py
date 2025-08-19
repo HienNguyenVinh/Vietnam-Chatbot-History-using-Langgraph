@@ -15,6 +15,7 @@ class AgentState(InputState):
     retrieved_documents: List[Any] = field(default_factory=list)
     web_search_results : Optional[str] = None
 
-    final_answer: Optional[str] = None
-    reflect_result: Optional[str] = None
-    state_graph: Literal["good", "bad"] = "bad" 
+    final_answer: Optional[str] = None # final result for user
+    reflect_result: Optional[str] = None # result of reflection - comment of "teacher"
+    eval: Literal["good", "bad"] = "bad" # summerization of these comments - good or bad
+    eval_history: List[Any] = field(default_factory=list)

@@ -1,8 +1,8 @@
 from langgraph.graph import START, END, StateGraph
-from langchain.prompts import ChatPromptTemplate
 from langchain_community.tools import TavilySearchResults
 from langchain_core.documents import Document
 from dotenv import load_dotenv
+import asyncio
 import os
 import logging
 from typing import Dict, Any, List, TypedDict, Literal, cast
@@ -10,7 +10,7 @@ from typing import Dict, Any, List, TypedDict, Literal, cast
 from .sub_graph import rag_graph
 from .states import AgentState, InputState
 from .models import LanguageModel
-from .prompts import CLASSIFIER_SYSTEM_PROMPT, RESPONSE_SYSTEM_PROMPT, REFLECTION_PROMPT
+from .prompts import CLASSIFIER_SYSTEM_PROMPT, REFLECTION_PROMPT, CHITCHAT_RESPONSE_SYSTEM_PROMPT, HISTORY_RESPONSE_SYSTEM_PROMPT
 from .utils.utils import config
 
 load_dotenv()
@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-MAX_ITERATOR = 3
+MAX_ITERATOR = config["reflection"]["max_iterator"]
 MODEL_NAME = config["llm"]["gemini"]
 
 web_search_tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY)
@@ -28,18 +28,26 @@ llm_model = llm.model
 
 
 class Router(TypedDict):
-    query_type: Literal["web", "db"]
+    query_type: Literal["history", "chitchat"]
 
 async def classify_time(state: AgentState) -> Dict[str, str]:
     """
-    Classify year to search 2000+ or 2000-
+    Classify the latest user message as a historical/time query or chitchat.
+
+    Args:
+        state (AgentState): Current conversation state.
+
+    Returns:
+        Dict[str, str]: Dictionary containing:
+            - "query_type": either "history" or "chitchat", as returned by the LLM classifier.
+            - "user_input": the raw text of the latest user message extracted from state.
     """
     logging.info("---ANALYZE AND ROUTE QUERY---")
     logging.info(f"MESSAGES: {state['messages']}")
     messages = [
         {"role": "system", "content": CLASSIFIER_SYSTEM_PROMPT},
-    ] + state["messages"]
-    user_input = state["messages"][-1].content
+    ] + state['messages']
+    user_input = state['messages'][-1].content
 
     response = cast(Router, await llm_model.with_structured_output(Router).ainvoke(messages))
     logging.info(f"ROUTER TO {response}")
@@ -47,32 +55,61 @@ async def classify_time(state: AgentState) -> Dict[str, str]:
     return {"query_type": response["query_type"], "user_input": user_input}
 
 def router_query(state: AgentState) -> Literal["search_web", "search_db"]:
-    if state["query_type"] == "db":
-        return "search_db"
-    elif state["query_type"] == "web":
-        return "search_web"
+    if state['query_type'] == "history":
+        return "search_history"
+    elif state['query_type'] == "chitchat":
+        return "handle_chitchat"
     else:
         raise ValueError(f"Unknown router type: {state['router']}")
 
-async def search_web(state: AgentState) -> Dict[str, Any]:
-    """
-    Searching web
-    """
-    logging.info(f"---START SEARCH WEB---")
-    web_results = web_search_tool.invoke({"query": state['user_input']})
-    combined = "\n".join([r["content"] for r in web_results])
-    logging.info(f"---SEARCH WEB DONE---")
+async def rag(user_query: str) -> List[Any]:
+    results = rag_graph.ainvoke({"user_query": user_query})
+    return results
 
-    return {"web_search_results": combined}
+async def web_search(user_query: str) -> List[Any]:
+    results = web_search_tool.ainvoke({"query": user_query})
+    return results
 
-async def search_db(state: AgentState) -> List[Any]:
+async def search_history(state: AgentState) -> Dict[str, Any]:
     """
-    Searching db based on distance vector 
+    Search external sources concurrently for the user's historical query.
+
+    Args:
+        state (AgentState): Conversation state containing the user's query.
+
+    Returns:
+        Dict[str, Any]: A dictionary with two keys:
+            - "retrieved_documents" (List[Any]): Results returned by the RAG pipeline
+              (or an empty list if the RAG call failed).
+            - "web_search_results" (List[Any]): Results returned by the web search
+              (or an empty list if the web search call failed).
     """
-    logging.info(f"---START RAG---")
-    result = await rag_graph.ainvoke({"user_query": state['user_input']})
-    logging.info(f"---RAG DONE---")
-    return {"retrieved_documents": result["retrieved_documents"]}
+
+    logging.info("---START SEARCHING---")
+    results = await asyncio.gather(
+        rag(state["user_input"]),
+        web_search(state["user_input"]),
+        return_exceptions=True,
+    )
+    logging.info("---SEARCHING FINISHED---")
+
+    rag_results, web_results = results
+
+    if isinstance(rag_results, Exception):
+        logging.error("RAG failed!", exc_info=rag_results)
+        rag_results = []
+    
+    if isinstance(web_results, Exception):
+        logging.error("WEB SEARCH failed!", exc_info=web_results)
+        web_results = []
+    
+    logger.info(f"---rag results: {len(rag_results)}...")
+    logger.info(f"---web search results: {len(web_results)}...")
+
+    return {
+        "retrieved_documents": rag_results,
+        "web_search_results": web_results
+    }
 
 def _format_documents(documents: List[Document]):
     results = []
@@ -81,17 +118,43 @@ def _format_documents(documents: List[Document]):
     
     return "\n".join(results)
 
-async def aggregate(state: AgentState) -> Dict[str, str]:
+async def chitchat_response(state: AgentState) -> Dict[str, str]:
     """
-    generate final answer rely on query and extral data - searched on web or db
+    Generate the final user-facing answer using the query.
+
+    Args:
+        state (AgentState): Conversation state containing at least:
+
+    Returns:
+        Dict[str, str]: A dictionary with key 'final_answer' whose value is the model's reply.
     """
-    if state["query_type"] == 'db':
-        prompt = RESPONSE_SYSTEM_PROMPT + "\nRETRIEVED DOCUMENTS:\n" + _format_documents(state['retrieved_documents'])
-    else:
-        prompt = RESPONSE_SYSTEM_PROMPT + "\nRETRIEVED DOCUMENTS:\n" + state['web_search_results']
 
     messages = [
-        {"role": "system", "content": prompt},
+            {"role": "system", "content": CHITCHAT_RESPONSE_SYSTEM_PROMPT},
+    ] + state['messages']
+
+    answer = await llm_model.ainvoke(messages)
+
+    return {"final_answer": answer}
+
+async def history_response(state: AgentState) -> Dict[str, str]:
+    """
+    Generate the final user-facing answer using the query and external data.
+
+    Args:
+        state (AgentState): Conversation state containing at least:
+
+    Returns:
+        Dict[str, str]: A dictionary with key 'final_answer' whose value is the model's reply.
+    """
+
+    promt = HISTORY_RESPONSE_SYSTEM_PROMPT.format(
+        rag_results = _format_documents(state["retrieved_documents"]),
+        web_results = "\n".join(state['web_search_results'])
+    )
+
+    messages = [
+        {"role": "system", "content": promt},
     ] + state["messages"]
 
     answer = await llm_model.ainvoke(messages)
@@ -100,8 +163,22 @@ async def aggregate(state: AgentState) -> Dict[str, str]:
 
 async def reflect(state: AgentState):
     """
-    Comment the final result and return advices
+    Evaluate the assistant's last answer and produce a short reflection.
+
+    Args:
+        state (AgentState): Conversation state containing at least:
+            - 'user_input' (str): the original user question.
+            - 'final_answer' (str): the assistant's answer to evaluate.
+
+    Returns:
+        Dict[str, str]: Structured result with two keys:
+            - "reflect_result": short human-readable critique or improvement suggestions (one or two sentences).
+            - "eval": overall binary judgement, either "good" or "bad".
     """
+    class Eval:
+        reflect_result: str
+        eval: Literal["good", "bad"]
+
     answer = state['final_answer']
     query = state['user_input']
 
@@ -110,12 +187,9 @@ async def reflect(state: AgentState):
         {"role": "user", "content": f"Câu hỏi: {query}\nTrả lời: {answer}"}
     ]
 
-    revised = await llm_model.ainvoke(messages)
+    results = cast(Eval, await llm_model.with_structured_output(Eval).ainvoke(messages))
     
-    if "good" in revised.content.lower():
-        return {"reflect_result": revised, "state_graph": "good"}
-    if "bad" in revised.content.lower():
-        return {"reflect_result": revised, "state_graph": "bad"}
+    return results
 
 
 # Khởi tạo checkpointer chạy sync bình thường
@@ -139,36 +213,55 @@ async def init_checkpointer(db_path: str = "chatbot.db"):
 
     return saver
 
+def _get_num_iterations(eval_history):
+    return len(eval_history)
+
+def event_loop(state: AgentState) -> str:
+    """Determine next step based on reflection results"""
+
+    eval_history = state.get("eval_history", [])
+    current_eval = state["eval"]
+
+    eval_history.append(current_eval)
+    state["eval_history"] = eval_history
+
+    num_iterations = _get_num_iterations(eval_history)
+    
+    logging.info(f"Event loop: Iteration {num_iterations}, Eval: {eval}")
+    
+    # End conditions
+    if num_iterations >= MAX_ITERATOR:
+        logging.info(f"Max iterations ({MAX_ITERATOR}) reached. Ending.")
+        return END
+    
+    if eval == "good":
+        logging.info("Answer quality is good. Ending.")
+        return END
+    
+    if eval == "bad":
+        logging.info("Answer needs improvement. Retrying...")
+        # Return to appropriate search based on query type
+        return "search_history"
+    
+    # Default fallback
+    logging.warning(f"Unexpected eval value: {eval}. Ending.")
+    return END
 
 builder = StateGraph(AgentState, input=InputState)
 
 builder.add_node("classify", classify_time)
-builder.add_node("search_web", search_web)
-builder.add_node("search_db", search_db)
-builder.add_node("aggregate", aggregate)
+builder.add_node("search_history", search_history)
+builder.add_node("chitchat_response")
+builder.add_node("history_response")
 builder.add_node("reflect", reflect)
 
 builder.add_conditional_edges("classify", router_query)
 
 builder.add_edge(START, "classify")
-builder.add_edge("search_web", "aggregate")
-builder.add_edge("search_db", "aggregate")
-builder.add_edge("aggregate", "reflect")
-
-
-def _get_num_iterations(state):
-    return len(state["messages"])
-
-def event_loop(state) -> str:
-    num_iterations = _get_num_iterations(state)
-    print(state)
-    if num_iterations > MAX_ITERATOR or state['state_graph'] == "good":
-        return END
-    return "search_web" if state["query_type"] == "web" else "search_db"
+builder.add_edge("search_history", "history_response")
+builder.add_edge("history_response", "reflect")
+builder.add_edge("chitchat_response", END)
     
 builder.add_conditional_edges("reflect", event_loop)
 
 graph = builder.compile(checkpointer=checkpointer) 
-
-# output = await graph.ainvoke({"user_input": "Hồ quý ly có tác động gì để Việt Nam"})
-# print(output["final_answer"])
