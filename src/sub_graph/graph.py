@@ -8,7 +8,8 @@ from mxbai_rerank import MxbaiRerankV2
 import asyncio
 import logging
 from dotenv import load_dotenv
-
+import chromadb
+from langchain_community.retrievers import BM25Retriever
 from ..utils.utils import config
 from .states import State
 from .prompts import GENERATE_QUERY_SYSTEM_PROMPT
@@ -96,7 +97,15 @@ async def vector_search(query: str, category: str) -> List[Document]:
 # Dùng thư viện from langchain_community.retrievers import BM25Retriever
 # Ec ec ec
 async def bm25_search(bm25_search_keyword: str) -> List[Document]:
-    return []
+    client = chromadb.PersistentClient(path=DB_PATH)
+    collection = client.get_collection(COLLECTION_NAME)
+    raw = collection.get(include=["documents", "metadatas"])
+    all_docs = [
+        Document(page_content=doc, metadata=meta)
+        for doc, meta in zip(raw["documents"], raw["metadatas"])
+    ]
+    bm25_retriever = BM25Retriever.from_documents(all_docs, k=TOP_K)
+    return bm25_retriever.ainvoke(bm25_search_keyword)
 
 async def hybrid_search(state: State) -> Dict[Any, Any]:
     logger.info("___start searching...")
