@@ -105,7 +105,7 @@ async def bm25_search(bm25_search_keyword: str) -> List[Document]:
         for doc, meta in zip(raw["documents"], raw["metadatas"])
     ]
     bm25_retriever = BM25Retriever.from_documents(all_docs, k=TOP_K)
-    return bm25_retriever.ainvoke(bm25_search_keyword)
+    return await bm25_retriever.ainvoke(bm25_search_keyword)
 
 async def hybrid_search(state: State) -> Dict[Any, Any]:
     logger.info("___start searching...")
@@ -173,8 +173,33 @@ graph = builder.compile()
 
 
 if __name__ == '__main__':
-    result = graph.invoke({"user_query": "Hồ Quý Ly đã làm gì?"})
-    print(result['output'])
+    import asyncio
+    from langchain_tavily import TavilySearch
+
+    documents = asyncio.run(graph.ainvoke({"user_query": "Hồ Quý Ly làm gì?"}))
+    documents = documents['retrieved_documents']
+    print(documents)
+    print(type(documents))
+    print(len(documents))
+    print(documents[0])
+    print(documents[0].page_content)
+    # import os
+    # load_dotenv()
+    
+    # from src.models import LanguageModel
+    # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    # logger = logging.getLogger(__name__)
+
+    # TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+    # MAX_ITERATOR = config["reflection"]["max_iterator"]
+    # MODEL_NAME = config["llm"]["gemini"]
+
+    # web_search_tool = TavilySearch(tavily_api_key=TAVILY_API_KEY, max_results=3)
+    # llm = LanguageModel(name_model=MODEL_NAME)
+    # llm_model = llm.model
+
+    # answer = llm_model.invoke("Hồ Quý Ly là ai?")
+    # print(answer)
 
 
 # [

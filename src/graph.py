@@ -1,5 +1,5 @@
 from langgraph.graph import START, END, StateGraph
-from langchain_community.tools import TavilySearchResults
+from langchain_tavily import TavilySearch
 from langchain_core.documents import Document
 from dotenv import load_dotenv
 import asyncio
@@ -22,7 +22,7 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 MAX_ITERATOR = config["reflection"]["max_iterator"]
 MODEL_NAME = config["llm"]["gemini"]
 
-web_search_tool = TavilySearchResults(tavily_api_key=TAVILY_API_KEY)
+web_search_tool = TavilySearch(tavily_api_key=TAVILY_API_KEY, max_results=3)
 llm = LanguageModel(name_model=MODEL_NAME)
 llm_model = llm.model
 
@@ -30,7 +30,7 @@ llm_model = llm.model
 class Router(TypedDict):
     query_type: Literal["history", "chitchat"]
 
-async def classify_time(state: AgentState) -> Dict[str, str]:
+async def classify(state: AgentState) -> Dict[str, str]:
     """
     Classify the latest user message as a historical/time query or chitchat.
 
@@ -54,7 +54,7 @@ async def classify_time(state: AgentState) -> Dict[str, str]:
 
     return {"query_type": response["query_type"], "user_input": user_input}
 
-def router_query(state: AgentState) -> Literal["search_web", "search_db"]:
+def router_query(state: AgentState) -> Literal["search_history", "chitchat_response"]:
     if state['query_type'] == "history":
         return "search_history"
     elif state['query_type'] == "chitchat":
@@ -63,12 +63,14 @@ def router_query(state: AgentState) -> Literal["search_web", "search_db"]:
         raise ValueError(f"Unknown router type: {state['query_type']}")
 
 async def rag(user_query: str) -> List[Any]:
-    results = rag_graph.ainvoke({"user_query": user_query})
+    results = await rag_graph.ainvoke({"user_query": user_query})
+    results = results['retrieved_documents']
     return results
 
 async def web_search(user_query: str) -> List[Any]:
-    results = web_search_tool.ainvoke({"query": user_query})
-    return results
+    results = await web_search_tool.ainvoke({"query": user_query})
+    combined = [r['content'] for r in results['results']]
+    return combined
 
 async def search_history(state: AgentState) -> Dict[str, Any]:
     """
@@ -84,7 +86,6 @@ async def search_history(state: AgentState) -> Dict[str, Any]:
             - "web_search_results" (List[Any]): Results returned by the web search
               (or an empty list if the web search call failed).
     """
-
     logging.info("---START SEARCHING---")
     results = await asyncio.gather(
         rag(state["user_input"]),
@@ -92,7 +93,6 @@ async def search_history(state: AgentState) -> Dict[str, Any]:
         return_exceptions=True,
     )
     logging.info("---SEARCHING FINISHED---")
-
     rag_results, web_results = results
 
     if isinstance(rag_results, Exception):
@@ -111,7 +111,7 @@ async def search_history(state: AgentState) -> Dict[str, Any]:
         "web_search_results": web_results
     }
 
-def _format_documents(documents: List[Document]):
+def _format_documents(documents: List[Any]):
     results = []
     for doc in documents:
         results.append(doc.page_content)
@@ -133,7 +133,13 @@ async def chitchat_response(state: AgentState) -> Dict[str, str]:
             {"role": "system", "content": CHITCHAT_RESPONSE_SYSTEM_PROMPT},
     ] + state['messages']
 
-    answer = await llm_model.ainvoke(messages)
+    try:
+        answer = await asyncio.wait_for(llm_model.ainvoke(messages), timeout=10)
+    except asyncio.TimeoutError:
+        print(messages)
+
+        logging.error("LLM call timeout!")
+        answer = "Xin lỗi, hệ thống đang gặp sự cố."
 
     return {"final_answer": answer}
 
@@ -147,17 +153,22 @@ async def history_response(state: AgentState) -> Dict[str, str]:
     Returns:
         Dict[str, str]: A dictionary with key 'final_answer' whose value is the model's reply.
     """
-
+    print("enter!")
+    print(state)
     promt = HISTORY_RESPONSE_SYSTEM_PROMPT.format(
         rag_results = _format_documents(state["retrieved_documents"]),
         web_results = "\n".join(state['web_search_results'])
     )
-
     messages = [
         {"role": "system", "content": promt},
     ] + state["messages"]
 
-    answer = await llm_model.ainvoke(messages)
+    try:
+        answer = await asyncio.wait_for(llm_model.ainvoke(messages), timeout=10)
+    except asyncio.TimeoutError:
+        print(messages)
+        logging.error("LLM call timeout!")
+        answer = "Xin lỗi, hệ thống đang gặp sự cố."
 
     return {"final_answer": answer}
 
@@ -227,41 +238,41 @@ def event_loop(state: AgentState) -> str:
 
     num_iterations = _get_num_iterations(eval_history)
     
-    logging.info(f"Event loop: Iteration {num_iterations}, Eval: {eval}")
+    logging.info(f"Event loop: Iteration {num_iterations}, Eval: {current_eval}")
     
     # End conditions
     if num_iterations >= MAX_ITERATOR:
         logging.info(f"Max iterations ({MAX_ITERATOR}) reached. Ending.")
         return END
     
-    if eval == "good":
+    if current_eval == "good":
         logging.info("Answer quality is good. Ending.")
         return END
     
-    if eval == "bad":
+    if current_eval == "bad":
         logging.info("Answer needs improvement. Retrying...")
         # Return to appropriate search based on query type
         return "search_history"
     
     # Default fallback
-    logging.warning(f"Unexpected eval value: {eval}. Ending.")
+    logging.warning(f"Unexpected eval value: {current_eval}. Ending.")
     return END
 
 builder = StateGraph(AgentState, input=InputState)
 
-builder.add_node("classify", classify_time)
+builder.add_node("classify", classify)
 builder.add_node("search_history", search_history)
-builder.add_node("chitchat_response")
-builder.add_node("history_response")
+builder.add_node("chitchat_response", chitchat_response)
+builder.add_node("history_response", history_response)
 builder.add_node("reflect", reflect)
-
-builder.add_conditional_edges("classify", router_query)
 
 builder.add_edge(START, "classify")
 builder.add_edge("search_history", "history_response")
 builder.add_edge("history_response", "reflect")
 builder.add_edge("chitchat_response", END)
-    
+
+
+builder.add_conditional_edges("classify", router_query)
 builder.add_conditional_edges("reflect", event_loop)
 
 graph = builder.compile(checkpointer=checkpointer) 

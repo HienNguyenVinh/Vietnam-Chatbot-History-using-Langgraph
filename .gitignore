@@ -16,3 +16,7 @@ log.txt
 chroma_db
 .idea/
 db_helper/chroma_db.zip
+output.txt
+chatbot.db
+chatbot.db-shm
+chatbot.db-wal

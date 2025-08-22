@@ -99,6 +99,8 @@ def vector_search_chroma(
 
 print("___________Start_____________")
 client = chromadb.PersistentClient(path=Path(__file__).parent / "chroma_db")
+
+print(Path(__file__).parent / "chroma_db")
 print(client.list_collections())
 collection = client.get_collection("viet_history")
 print("___________get db success__________")
