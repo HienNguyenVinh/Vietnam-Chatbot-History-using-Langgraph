@@ -58,9 +58,9 @@ def router_query(state: AgentState) -> Literal["search_web", "search_db"]:
     if state['query_type'] == "history":
         return "search_history"
     elif state['query_type'] == "chitchat":
-        return "handle_chitchat"
+        return "chitchat_response"
     else:
-        raise ValueError(f"Unknown router type: {state['router']}")
+        raise ValueError(f"Unknown router type: {state['query_type']}")
 
 async def rag(user_query: str) -> List[Any]:
     results = rag_graph.ainvoke({"user_query": user_query})
@@ -265,3 +265,17 @@ builder.add_edge("chitchat_response", END)
 builder.add_conditional_edges("reflect", event_loop)
 
 graph = builder.compile(checkpointer=checkpointer) 
+
+
+def retrieve_all_threads():
+    """
+    Retrieve all chat threads from the database.
+    This function should be implemented to fetch threads from your database.
+    """
+    if checkpointer is None:
+        return []
+    all_threads = set()
+    for checkpoint in checkpointer.list(None):
+        if "thread_id" in checkpoint.config.get("configurable", {}):
+            all_threads.add(checkpoint.config["configurable"]["thread_id"])
+    return list(all_threads)
