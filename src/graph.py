@@ -30,7 +30,7 @@ llm_model = llm.model
 class Router(TypedDict):
     query_type: Literal["history", "chitchat"]
 
-async def classify_time(state: AgentState) -> Dict[str, str]:
+def classify_time(state: AgentState) -> Dict[str, str]:
     """
     Classify the latest user message as a historical/time query or chitchat.
 
@@ -49,18 +49,18 @@ async def classify_time(state: AgentState) -> Dict[str, str]:
     ] + state['messages']
     user_input = state['messages'][-1].content
 
-    response = cast(Router, await llm_model.with_structured_output(Router).ainvoke(messages))
+    response = cast(Router, llm_model.with_structured_output(Router).invoke(messages))
     logging.info(f"ROUTER TO {response}")
 
     return {"query_type": response["query_type"], "user_input": user_input}
 
-def router_query(state: AgentState) -> Literal["search_web", "search_db"]:
+def router_query(state: AgentState) -> Literal["search_history", "chitchat_response"]:
     if state['query_type'] == "history":
         return "search_history"
     elif state['query_type'] == "chitchat":
-        return "handle_chitchat"
+        return "chitchat_response"
     else:
-        raise ValueError(f"Unknown router type: {state['router']}")
+        raise ValueError(f"Unknown router type: {state['query_type']}")
 
 async def rag(user_query: str) -> List[Any]:
     results = rag_graph.ainvoke({"user_query": user_query})
@@ -201,7 +201,7 @@ checkpointer = None
 
 async def init_checkpointer(db_path: str = "chatbot.db"):
     import aiosqlite
-    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver 
     logging.info("---INIT CHECKPOINTER---")
     try:
         conn = await aiosqlite.connect(db_path)
@@ -251,8 +251,8 @@ builder = StateGraph(AgentState, input=InputState)
 
 builder.add_node("classify", classify_time)
 builder.add_node("search_history", search_history)
-builder.add_node("chitchat_response")
-builder.add_node("history_response")
+builder.add_node("chitchat_response", chitchat_response)
+builder.add_node("history_response", history_response)
 builder.add_node("reflect", reflect)
 
 builder.add_conditional_edges("classify", router_query)
@@ -265,3 +265,16 @@ builder.add_edge("chitchat_response", END)
 builder.add_conditional_edges("reflect", event_loop)
 
 graph = builder.compile(checkpointer=checkpointer) 
+
+def retrieve_all_threads():
+    """
+    Retrieve all chat threads from the database.
+    This function should be implemented to fetch threads from your database.
+    """
+    if checkpointer is None:
+        return []
+    all_threads = set()
+    for checkpoint in checkpointer.list(None):
+        if "thread_id" in checkpoint.config.get("configurable", {}):
+            all_threads.add(checkpoint.config["configurable"]["thread_id"])
+    return list(all_threads)
