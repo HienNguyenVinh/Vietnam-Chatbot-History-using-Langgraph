@@ -28,6 +28,10 @@ llm_model = llm.model
 
 
 class Router(TypedDict):
+    """
+    This is the data structure type of query, with 1 key:
+    - "query_type" (str): "history" or "chitchat"
+    """
     query_type: Literal["history", "chitchat"]
 
 async def classify(state: AgentState) -> Dict[str, str]:
@@ -136,8 +140,6 @@ async def chitchat_response(state: AgentState) -> Dict[str, str]:
     try:
         answer = await asyncio.wait_for(llm_model.ainvoke(messages), timeout=10)
     except asyncio.TimeoutError:
-        print(messages)
-
         logging.error("LLM call timeout!")
         answer = "Xin lỗi, hệ thống đang gặp sự cố."
 
@@ -153,8 +155,6 @@ async def history_response(state: AgentState) -> Dict[str, str]:
     Returns:
         Dict[str, str]: A dictionary with key 'final_answer' whose value is the model's reply.
     """
-    print("enter!")
-    print(state)
     promt = HISTORY_RESPONSE_SYSTEM_PROMPT.format(
         rag_results = _format_documents(state["retrieved_documents"]),
         web_results = "\n".join(state['web_search_results'])
@@ -166,7 +166,6 @@ async def history_response(state: AgentState) -> Dict[str, str]:
     try:
         answer = await asyncio.wait_for(llm_model.ainvoke(messages), timeout=10)
     except asyncio.TimeoutError:
-        print(messages)
         logging.error("LLM call timeout!")
         answer = "Xin lỗi, hệ thống đang gặp sự cố."
 
@@ -186,7 +185,12 @@ async def reflect(state: AgentState):
             - "reflect_result": short human-readable critique or improvement suggestions (one or two sentences).
             - "eval": overall binary judgement, either "good" or "bad".
     """
-    class Eval:
+    class Eval(TypedDict):
+        """
+        This is a data structure with two keys:
+        - 'reflect_result' (str): short human-readable critique or improvement suggestions (one or two sentences).
+        - 'eval' (str): overall binary judgement, "good" or "bad"
+        """
         reflect_result: str
         eval: Literal["good", "bad"]
 
@@ -197,9 +201,8 @@ async def reflect(state: AgentState):
         {"role": "system", "content": REFLECTION_PROMPT},
         {"role": "user", "content": f"Câu hỏi: {query}\nTrả lời: {answer}"}
     ]
-
     results = cast(Eval, await llm_model.with_structured_output(Eval).ainvoke(messages))
-    
+    print(f"hello: {results}")
     return results
 
 
@@ -231,7 +234,7 @@ def event_loop(state: AgentState) -> str:
     """Determine next step based on reflection results"""
 
     eval_history = state.get("eval_history", [])
-    current_eval = state["eval"]
+    current_eval = state.get('eval')
 
     eval_history.append(current_eval)
     state["eval_history"] = eval_history
@@ -290,3 +293,10 @@ def retrieve_all_threads():
         if "thread_id" in checkpoint.config.get("configurable", {}):
             all_threads.add(checkpoint.config["configurable"]["thread_id"])
     return list(all_threads)
+
+
+documents = asyncio.run(graph.ainvoke(
+    {"messages": [{"role": "user", "content": "Hồ Quý Ly sinh năm bao nhiêu?"}]},
+            config=config,
+            stream_mode="messages"))
+print(documents)

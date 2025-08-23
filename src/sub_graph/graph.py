@@ -176,30 +176,30 @@ if __name__ == '__main__':
     import asyncio
     from langchain_tavily import TavilySearch
 
-    documents = asyncio.run(graph.ainvoke({"user_query": "Hồ Quý Ly làm gì?"}))
-    documents = documents['retrieved_documents']
-    print(documents)
-    print(type(documents))
-    print(len(documents))
-    print(documents[0])
-    print(documents[0].page_content)
-    # import os
-    # load_dotenv()
+    # documents = asyncio.run(graph.ainvoke({"user_query": "Hồ Quý Ly làm gì?"}))
+    # documents = documents['retrieved_documents']
+    # print(documents)
+    # print(type(documents))
+    # print(len(documents))
+    # print(documents[0])
+    # print(documents[0].page_content)
+    import os
+    load_dotenv()
     
-    # from src.models import LanguageModel
-    # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    # logger = logging.getLogger(__name__)
+    from src.models import LanguageModel
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
 
-    # TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-    # MAX_ITERATOR = config["reflection"]["max_iterator"]
-    # MODEL_NAME = config["llm"]["gemini"]
+    TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+    MAX_ITERATOR = config["reflection"]["max_iterator"]
+    MODEL_NAME = config["llm"]["gemini"]
 
-    # web_search_tool = TavilySearch(tavily_api_key=TAVILY_API_KEY, max_results=3)
-    # llm = LanguageModel(name_model=MODEL_NAME)
-    # llm_model = llm.model
+    web_search_tool = TavilySearch(tavily_api_key=TAVILY_API_KEY, max_results=3)
+    llm = LanguageModel(name_model=MODEL_NAME)
+    llm_model = llm.model
 
-    # answer = llm_model.invoke("Hồ Quý Ly là ai?")
-    # print(answer)
+    answer = llm_model.invoke("Hồ Quý Ly là ai?")
+    print(answer)
 
 
 # [
