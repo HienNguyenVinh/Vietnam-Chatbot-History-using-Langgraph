@@ -1,12 +1,13 @@
 retriever:
   embedding_model: Qwen/Qwen3-Embedding-0.6B
   collection_name: viet_history
-  db_path: C:\Users\ADMIN\Downloads\Vietnam-Chatbot-History-using-Langgraph\db_helper\chroma_db
+  db_path: db_helper/chroma_db
   top_k: 5
   rerank_model: mixedbread-ai/mxbai-rerank-base-v2
-  generate_query_model: gemini-2.5-flash-lite
+  generate_query_model: gemini-2.0-flash-lite
 reflection:
   max_iterator: 3
 llm:
-  gemini: gemini-2.5-flash
+  gemini: gemini-2.0-flash
+  groq: openai/gpt-oss-120b
   temperature: 0

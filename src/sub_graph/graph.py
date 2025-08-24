@@ -3,22 +3,23 @@ from chromadb import PersistentClient
 from sentence_transformers import SentenceTransformer
 from langgraph.graph import START, END, StateGraph
 from langchain_core.documents import Document
-from langchain_google_genai import ChatGoogleGenerativeAI
 from mxbai_rerank import MxbaiRerankV2
 import asyncio
 import logging
 from dotenv import load_dotenv
-import chromadb
-from langchain_community.retrievers import BM25Retriever
+from src.models import LanguageModel
+
 from ..utils.utils import config
 from .states import State
-from .prompts import GENERATE_QUERY_SYSTEM_PROMPT
+from .bm25_lazy import get_bm25
+from .prompts import paths_dict, GENERATE_QUERY_SYSTEM_PROMPT
 
 load_dotenv()
 
 EMBEDDING_MODEL = config["retriever"]["embedding_model"]
 RERANK_MODEL = config["retriever"]["rerank_model"]
 GENERATE_QUERY_MODEL = config["retriever"]["generate_query_model"]
+GROQ_MODEL_NAME = config["llm"]["groq"]
 
 TOP_K = config["retriever"]["top_k"]
 COLLECTION_NAME = config["retriever"]["collection_name"]
@@ -27,26 +28,46 @@ DB_PATH = config["retriever"]["db_path"]
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+llm = LanguageModel(model_type="groq", name_model=GROQ_MODEL_NAME)
+llm_model = llm.model
+
+def resolve_ids_to_paths(ids: List[int], mapping: Dict[int, str]) -> List[str]:
+    """
+    Chuyển list id -> list relative_path (chuỗi).
+    Bỏ qua id không tồn tại (và in warning).
+    """
+    resolved = []
+    for raw in ids:
+        try:
+            idx = int(raw)
+        except Exception:
+            logging.info(f"Non-int id in relative_path: {raw} — skipping.")
+            continue
+        if idx in mapping:
+            resolved.append(mapping[idx])
+        else:
+            logging.info(f"id {idx} not found in mapping — skipping.")
+    return resolved
+
 class Query(TypedDict):
     vector_search_query : str
-    category: str
+    relative_path: list[int]
 
     bm25_search_keyword: str
 
 async def generate_query(state: State) -> Dict[str, str]:
     logger.info("___generating queries...")
-    model = ChatGoogleGenerativeAI(model=GENERATE_QUERY_MODEL)
     messages=[
         {"role": "system", "content": GENERATE_QUERY_SYSTEM_PROMPT},
         {"role": "human", "content": state.user_query}
     ]
 
-    response = cast(Query, await model.with_structured_output(Query).ainvoke(messages))
+    response = cast(Query, await llm_model.with_structured_output(Query).ainvoke(messages))
     logger.info(f"___generated queries: {response}")
 
     return response
 
-async def vector_search(query: str, category: str) -> List[Document]:
+async def vector_search(query: str, paths: list[str]) -> List[Document]:
     client = PersistentClient(path=DB_PATH)
     try:
         collection = client.get_collection(COLLECTION_NAME)
@@ -55,8 +76,7 @@ async def vector_search(query: str, category: str) -> List[Document]:
         embedding = model.encode(query, convert_to_numpy=True)
         include = ["metadatas", "documents", "distances"]
 
-        where = {}
-        where["category"] = category
+        where = {"relative_path": {"$in": paths}}
 
         results = collection.query(
             query_embeddings=[embedding.tolist()],
@@ -97,20 +117,17 @@ async def vector_search(query: str, category: str) -> List[Document]:
 # Dùng thư viện from langchain_community.retrievers import BM25Retriever
 # Ec ec ec
 async def bm25_search(bm25_search_keyword: str) -> List[Document]:
-    client = chromadb.PersistentClient(path=DB_PATH)
-    collection = client.get_collection(COLLECTION_NAME)
-    raw = collection.get(include=["documents", "metadatas"])
-    all_docs = [
-        Document(page_content=doc, metadata=meta)
-        for doc, meta in zip(raw["documents"], raw["metadatas"])
-    ]
-    bm25_retriever = BM25Retriever.from_documents(all_docs, k=TOP_K)
+    bm25_retriever = await get_bm25()
+    
     return await bm25_retriever.ainvoke(bm25_search_keyword)
 
 async def hybrid_search(state: State) -> Dict[Any, Any]:
     logger.info("___start searching...")
+    ids = state.relative_path
+    paths = resolve_ids_to_paths(ids, paths_dict)
+
     results = await asyncio.gather(
-        vector_search(state.vector_search_query, state.category),
+        vector_search(state.vector_search_query, paths),
         bm25_search(state.bm25_search_keyword),
         return_exceptions=True
     )

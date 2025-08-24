@@ -7,7 +7,7 @@ class State():
     user_query: Optional[str] = None
     
     vector_search_query : Optional[str] = None
-    category: Optional[str] = None
+    relative_path: List[int] = field(default_factory=list)
     bm25_search_keyword: Optional[str] = None
 
     retrieved_documents: List[Document] = field(default_factory=list)

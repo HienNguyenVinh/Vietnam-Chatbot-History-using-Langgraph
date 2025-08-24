@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  vietnam_history_chatbot_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chatbot-app
+    env_file:
+      - .env
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./db_helper/chroma_db:/app/db_helper/chroma_db 
+      - ./chatbot.db:/app/chatbot.db                   
+      - ./src:/app/src                                  
+      - ./front_end.py:/app/front_end.py                
+    restart: unless-stopped

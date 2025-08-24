@@ -1,0 +1,17 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+.env
+.venv
+venv
+.env.*
+.git
+.gitignore
+*.db-wal
+*.db-shm
+db_helper/preprocessed_text/
+db_helper/chunking/
+src/demo/

@@ -20,10 +20,13 @@ logger = logging.getLogger(__name__)
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 MAX_ITERATOR = config["reflection"]["max_iterator"]
-MODEL_NAME = config["llm"]["gemini"]
+
+GEMINI_MODEL_NAME = config["llm"]["gemini"]
+GROQ_MODEL_NAME = config["llm"]["groq"]
 
 web_search_tool = TavilySearch(tavily_api_key=TAVILY_API_KEY, max_results=3)
-llm = LanguageModel(name_model=MODEL_NAME)
+# llm = LanguageModel(model_type="gemini", name_model=GEMINI_MODEL_NAME)
+llm = LanguageModel(model_type="groq", name_model=GROQ_MODEL_NAME)
 llm_model = llm.model
 
 
@@ -211,8 +214,6 @@ async def reflect(state: AgentState):
 # checkpointer = AsyncSqliteSaver(conn=conn)
 
 # Khởi tạo checkpointer để chạy async
-checkpointer = None
-
 async def init_checkpointer(db_path: str = "chatbot.db"):
     import aiosqlite
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -261,42 +262,31 @@ def event_loop(state: AgentState) -> str:
     logging.warning(f"Unexpected eval value: {current_eval}. Ending.")
     return END
 
-builder = StateGraph(AgentState, input=InputState)
+async def init_graph():
+    checkpointer = await init_checkpointer()
 
-builder.add_node("classify", classify)
-builder.add_node("search_history", search_history)
-builder.add_node("chitchat_response", chitchat_response)
-builder.add_node("history_response", history_response)
-builder.add_node("reflect", reflect)
+    builder = StateGraph(AgentState, input=InputState)
 
-builder.add_edge(START, "classify")
-builder.add_edge("search_history", "history_response")
-builder.add_edge("history_response", "reflect")
-builder.add_edge("chitchat_response", END)
+    builder.add_node("classify", classify)
+    builder.add_node("search_history", search_history)
+    builder.add_node("chitchat_response", chitchat_response)
+    builder.add_node("history_response", history_response)
+    builder.add_node("reflect", reflect)
 
-
-builder.add_conditional_edges("classify", router_query)
-builder.add_conditional_edges("reflect", event_loop)
-
-graph = builder.compile(checkpointer=checkpointer) 
+    builder.add_edge(START, "classify")
+    builder.add_edge("search_history", "history_response")
+    builder.add_edge("history_response", "reflect")
+    builder.add_edge("chitchat_response", END)
 
 
-def retrieve_all_threads():
-    """
-    Retrieve all chat threads from the database.
-    This function should be implemented to fetch threads from your database.
-    """
-    if checkpointer is None:
-        return []
-    all_threads = set()
-    for checkpoint in checkpointer.list(None):
-        if "thread_id" in checkpoint.config.get("configurable", {}):
-            all_threads.add(checkpoint.config["configurable"]["thread_id"])
-    return list(all_threads)
+    builder.add_conditional_edges("classify", router_query)
+    builder.add_conditional_edges("reflect", event_loop)
+
+    return builder.compile(checkpointer=checkpointer) 
 
 
-documents = asyncio.run(graph.ainvoke(
-    {"messages": [{"role": "user", "content": "Hồ Quý Ly sinh năm bao nhiêu?"}]},
-            config=config,
-            stream_mode="messages"))
-print(documents)
+# documents = asyncio.run(graph.ainvoke(
+#     {"messages": [{"role": "user", "content": "Hồ Quý Ly sinh năm bao nhiêu?"}]},
+#             config=config,
+#             stream_mode="messages"))
+# print(documents)
