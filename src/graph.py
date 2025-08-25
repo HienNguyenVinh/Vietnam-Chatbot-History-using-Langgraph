@@ -7,7 +7,7 @@ import os
 import logging
 from typing import Dict, Any, List, TypedDict, Literal, cast
 
-from .sub_graph import rag_graph
+from .sub_graph import rag_graph, init_model
 from .states import AgentState, InputState
 from .models import LanguageModel
 from .prompts import CLASSIFIER_SYSTEM_PROMPT, REFLECTION_PROMPT, CHITCHAT_RESPONSE_SYSTEM_PROMPT, HISTORY_RESPONSE_SYSTEM_PROMPT
@@ -158,12 +158,12 @@ async def history_response(state: AgentState) -> Dict[str, str]:
     Returns:
         Dict[str, str]: A dictionary with key 'final_answer' whose value is the model's reply.
     """
-    promt = HISTORY_RESPONSE_SYSTEM_PROMPT.format(
+    prompt = HISTORY_RESPONSE_SYSTEM_PROMPT.format(
         rag_results = _format_documents(state["retrieved_documents"]),
         web_results = "\n".join(state['web_search_results'])
     )
     messages = [
-        {"role": "system", "content": promt},
+        {"role": "system", "content": prompt},
     ] + state["messages"]
 
     try:
@@ -263,6 +263,7 @@ def event_loop(state: AgentState) -> str:
     return END
 
 async def init_graph():
+    await init_model()
     checkpointer = await init_checkpointer()
 
     builder = StateGraph(AgentState, input=InputState)

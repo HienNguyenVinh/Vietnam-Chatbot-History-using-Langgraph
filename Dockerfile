@@ -1,28 +1,23 @@
-# syntax=docker/dockerfile:1.4
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# copy requirements trước để tận dụng cache
-COPY requirements.txt .
-
-# Install build deps, install python deps (dùng cache pip), then purge build deps in the same RUN
-RUN --mount=type=cache,target=/root/.cache/pip \
-    apt-get update \
+# Cài gói hệ thống cần thiết
+RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      build-essential \
-      libpq-dev \
-      gcc \
-      curl \
-      git \
- && pip install --upgrade pip setuptools wheel \
- # ưu tiên binary nếu có, dùng cache mount cho pip
- && pip install --no-cache-dir --prefer-binary -r requirements.txt \
- # remove build deps to keep image small
- && apt-get purge -y --auto-remove build-essential gcc libpq-dev \
- && rm -rf /var/lib/apt/lists/* /root/.cache/pip
+    build-essential \
+    libpq-dev \
+    gcc \
+    git \
+    curl \
+ && rm -rf /var/lib/apt/lists/*
 
-# Copy source
+# Copy và cài dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+ && pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
 COPY . .
 
 EXPOSE 8501

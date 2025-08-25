@@ -31,6 +31,10 @@ logger = logging.getLogger(__name__)
 llm = LanguageModel(model_type="groq", name_model=GROQ_MODEL_NAME)
 llm_model = llm.model
 
+async def init_model():
+    embed_model = SentenceTransformer(EMBEDDING_MODEL)
+    rerank_model = MxbaiRerankV2(RERANK_MODEL)
+
 def resolve_ids_to_paths(ids: List[int], mapping: Dict[int, str]) -> List[str]:
     """
     Chuyển list id -> list relative_path (chuỗi).
