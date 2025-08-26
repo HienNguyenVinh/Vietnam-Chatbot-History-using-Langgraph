@@ -32,6 +32,7 @@ llm = LanguageModel(model_type="groq", name_model=GROQ_MODEL_NAME)
 llm_model = llm.model
 
 async def init_model():
+    global embed_model, rerank_model
     embed_model = SentenceTransformer(EMBEDDING_MODEL)
     rerank_model = MxbaiRerankV2(RERANK_MODEL)
 
@@ -75,9 +76,10 @@ async def vector_search(query: str, paths: list[str]) -> List[Document]:
     client = PersistentClient(path=DB_PATH)
     try:
         collection = client.get_collection(COLLECTION_NAME)
-        model = SentenceTransformer(EMBEDDING_MODEL)
+        global embed_model
+        # model = SentenceTransformer(EMBEDDING_MODEL)
 
-        embedding = model.encode(query, convert_to_numpy=True)
+        embedding = embed_model.encode(query, convert_to_numpy=True)
         include = ["metadatas", "documents", "distances"]
 
         where = {"relative_path": {"$in": paths}}
@@ -166,12 +168,13 @@ def _format_documents(documents: List[Document]):
 
 async def rerank(state: State) -> Dict[str, List[any]]:
     logger.info("___start reranking...")
-    model = MxbaiRerankV2(RERANK_MODEL)
+    global rerank_model
+    # model = MxbaiRerankV2(RERANK_MODEL)
     query = state.user_query
     documents = _format_documents(state.retrieved_documents)
 
     try: 
-        results = model.rerank(query, documents, return_documents=True, top_k=5)
+        results = rerank_model.rerank(query, documents, return_documents=True, top_k=5)
     except Exception as e:
         results = state.retrieved_documents
 

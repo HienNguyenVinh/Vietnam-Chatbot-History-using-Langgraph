@@ -283,11 +283,5 @@ async def init_graph():
     builder.add_conditional_edges("classify", router_query)
     builder.add_conditional_edges("reflect", event_loop)
 
-    return builder.compile(checkpointer=checkpointer) 
-
-
-# documents = asyncio.run(graph.ainvoke(
-#     {"messages": [{"role": "user", "content": "Hồ Quý Ly sinh năm bao nhiêu?"}]},
-#             config=config,
-#             stream_mode="messages"))
-# print(documents)
+    graph = builder.compile(checkpointer=checkpointer) 
+    return graph
