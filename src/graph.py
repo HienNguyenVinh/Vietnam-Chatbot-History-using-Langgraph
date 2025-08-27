@@ -146,7 +146,7 @@ async def chitchat_response(state: AgentState) -> Dict[str, str]:
         logging.error("LLM call timeout!")
         answer = "Xin lỗi, hệ thống đang gặp sự cố."
 
-    return {"final_answer": answer}
+    return {"final_answer": answer.content}
 
 async def history_response(state: AgentState) -> Dict[str, str]:
     """
@@ -166,13 +166,15 @@ async def history_response(state: AgentState) -> Dict[str, str]:
         {"role": "system", "content": prompt},
     ] + state["messages"]
 
+    print("*" * 100)
+    print(messages)
     try:
         answer = await asyncio.wait_for(llm_model.ainvoke(messages), timeout=10)
     except asyncio.TimeoutError:
         logging.error("LLM call timeout!")
         answer = "Xin lỗi, hệ thống đang gặp sự cố."
 
-    return {"final_answer": answer}
+    return {"final_answer": answer.content}
 
 async def reflect(state: AgentState):
     """
@@ -283,5 +285,5 @@ async def init_graph():
     builder.add_conditional_edges("classify", router_query)
     builder.add_conditional_edges("reflect", event_loop)
 
-    graph = builder.compile(checkpointer=checkpointer) 
+    graph = builder.compile(checkpointer=checkpointer)
     return graph

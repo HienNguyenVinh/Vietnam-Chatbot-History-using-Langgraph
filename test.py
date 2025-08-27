@@ -14,8 +14,6 @@ async def stream_response(graph, query: str, config: dict):
 
     try:
         async for event in agen:
-            # debug: print full event if cần
-            # print("EVENT:", repr(event))
             text = event[0].content
             print(text)
     except Exception as e:
@@ -32,3 +30,8 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+# [{'role': 'system', 'content': '\n'}, 
+#  HumanMessage(content='Chiến dịch Điện biên phủ diễn ra trong bao nhiêu ngày đêm', additional_kwargs={}, response_metadata={}, id='34731b8e-11ee-43d4-a216-f46cf6bc0e71'), 
+#  HumanMessage(content='Bác hồ ra đi tìm đường cứu nước trong bao nhiêu năm', additional_kwargs={}, response_metadata={}, id='15619bcc-fe9b-4358-bd7c-caeef8521f3f'), 
+#  HumanMessage(content='có', additional_kwargs={}, response_metadata={}, id='a4510b76-cce9-48cc-8805-6646fe135cd3')]

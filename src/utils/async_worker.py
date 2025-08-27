@@ -9,7 +9,7 @@ class AsyncWorker:
         self._started = threading.Event()
         self._graph = None
 
-    def start(self, init_graph_coroutine, init_timeout=30):
+    def start(self, init_graph_coroutine, init_timeout=300):
         """Start worker thread and initialize graph via init_graph_coroutine (async callable)."""
         if self._thread and self._thread.is_alive():
             return

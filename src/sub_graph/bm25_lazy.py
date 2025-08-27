@@ -13,7 +13,6 @@ _bm25: Optional[BM25Retriever] = None
 _bm25_lock = asyncio.Lock()
 
 async def _build_bm25() -> BM25Retriever:
-    # Nếu việc đọc collection sync, bạn vẫn gọi nó trong async func (OK)
     client = chromadb.PersistentClient(path=DB_PATH)
     collection = client.get_collection(COLLECTION_NAME)
 
