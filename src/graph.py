@@ -51,15 +51,22 @@ async def classify(state: AgentState) -> Dict[str, str]:
     """
     logging.info("---ANALYZE AND ROUTE QUERY---")
     logging.info(f"MESSAGES: {state['messages']}")
+    user_input = state['messages'][-1].content
+    current_chat = state.get("current_chat")
+    if current_chat is None:
+        current_chat = []
+    current_chat.append({"role": "user", "content": user_input})
+    
     messages = [
         {"role": "system", "content": CLASSIFIER_SYSTEM_PROMPT},
-    ] + state['messages']
-    user_input = state['messages'][-1].content
+    ] + current_chat
 
     response = cast(Router, await llm_model.with_structured_output(Router).ainvoke(messages))
     logging.info(f"ROUTER TO {response}")
 
-    return {"query_type": response["query_type"], "user_input": user_input}
+    return {"query_type": response["query_type"], 
+            "user_input": user_input,
+            "current_chat": current_chat}
 
 def router_query(state: AgentState) -> Literal["search_history", "chitchat_response"]:
     if state['query_type'] == "history":
@@ -138,15 +145,17 @@ async def chitchat_response(state: AgentState) -> Dict[str, str]:
 
     messages = [
             {"role": "system", "content": CHITCHAT_RESPONSE_SYSTEM_PROMPT},
-    ] + state['messages']
+    ] + state["current_chat"]
 
     try:
         answer = await asyncio.wait_for(llm_model.ainvoke(messages), timeout=10)
     except asyncio.TimeoutError:
         logging.error("LLM call timeout!")
         answer = "Xin lỗi, hệ thống đang gặp sự cố."
+    current_chat = state["current_chat"]
+    current_chat.append({"role": "assistant", "content": answer.content})
 
-    return {"final_answer": answer.content}
+    return {"final_answer": answer.content, "current_chat": current_chat}
 
 async def history_response(state: AgentState) -> Dict[str, str]:
     """
@@ -164,7 +173,7 @@ async def history_response(state: AgentState) -> Dict[str, str]:
     )
     messages = [
         {"role": "system", "content": prompt},
-    ] + state["messages"]
+    ] + state["current_chat"]
 
     print("*" * 100)
     print(messages)
@@ -174,7 +183,10 @@ async def history_response(state: AgentState) -> Dict[str, str]:
         logging.error("LLM call timeout!")
         answer = "Xin lỗi, hệ thống đang gặp sự cố."
 
-    return {"final_answer": answer.content}
+    current_chat = state["current_chat"]
+    current_chat.append({"role": "assistant", "content": answer.content})
+
+    return {"final_answer": answer.content, "current_chat": current_chat}
 
 async def reflect(state: AgentState):
     """
@@ -253,6 +265,7 @@ def event_loop(state: AgentState) -> str:
     
     if current_eval == "good":
         logging.info("Answer quality is good. Ending.")
+        state["current_chat"].append({"role": "assistant", "content": state["final_answer"]})
         return END
     
     if current_eval == "bad":

@@ -44,12 +44,12 @@ Hard rules (follow exactly):
 1. Use **only** information present in `rag_results` and `web_results`. Do NOT invent facts or add information not supported by those sources.
 2. Produce **a single, unified answer** (one short paragraph or a few short sentences). Do NOT output multiple alternative answers or JSON — only the answer text the user will read.
 3. If the web and rag disagree, present the web claim as the chosen fact, but briefly note the conflicting rag claim in one short clause.
-4. If the final chosen fact comes from web but rag gives a different value, show both briefly, e.g.: "Sự kiện X diễn ra năm 1945; một nguồn nội bộ ghi 1946."
-5. Keep the answer concise and directly focused on the user's question. Prefer 1–3 sentences; at most a short paragraph.
-6. If the provided data is insufficient to answer precisely, reply exactly:
+4. Keep the answer concise and directly focused on the user's question. Prefer 1–3 sentences; at most a short paragraph.
+5. If the provided data is insufficient to answer precisely, reply exactly:
    "Không đủ thông tin — tôi cần tra cứu thêm."
-7. Match the user's language when answering (Vietnamese if the user asked in Vietnamese).
-8. Output **only** the user-facing answer text — no system notes, no JSON, no explanation of process.
+6. Match the user's language when answering (Vietnamese if the user asked in Vietnamese).
+7. Output **only** the user-facing answer text — no system notes, no JSON, no explanation of process.
+8. Focus on the user's current question.
 
 Input data available to you:
 RAG_RESULTS:
