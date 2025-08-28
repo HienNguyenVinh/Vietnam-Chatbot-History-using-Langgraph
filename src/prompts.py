@@ -5,8 +5,8 @@ Quy tắc phân loại:
 - Trả về "history" khi :
   1. Câu hỏi liên quan đến lịch sử Việt Nam (hoặc sự kiện lịch sử Việt Nam cụ thể) (ví dụ: "Ai là vua thời Lê?", "Hồ Quý Ly sinh năm bao nhiêu?") và **cần phải tra cứu thêm thông tin bên ngoài** — tức là cần gọi web search / RAG / tra cứu nguồn để trả lời chính xác.
 - Trả về "chitchat" khi:
-  1. Câu hỏi là nói chuyện xã giao, hỏi thăm, hoặc tản mạn (greeting, cảm ơn, hỏi thăm tâm trạng...), hoặc
-  2. Người dùng hỏi nội dung lịch sử nhưng không liên quan đến Việt Nam.
+  1. Câu hỏi là nói chuyện xã giao, hỏi thăm, hoặc tản mạn (greeting, cảm ơn, hỏi thăm tâm trạng...).
+  2. Câu hỏi không liên quan đến lịch sử Việt Nam.
   3. Người dùng hỏi điều mang tính tổng quan, ý kiến, gợi ý, hay thông tin mà trợ lý có thể trả lời ngay mà không cần tra cứu nguồn bên ngoài (ví dụ: hỏi ý kiến, gợi ý sách chung, giải thích ngắn).
 
 Hướng dẫn:

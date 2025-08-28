@@ -34,7 +34,7 @@ llm_model = llm.model
 async def init_model():
     global embed_model, rerank_model
     embed_model = SentenceTransformer(EMBEDDING_MODEL, device="cpu", trust_remote_code=True)
-    rerank_model = MxbaiRerankV2(RERANK_MODEL, device="cpu")
+    rerank_model = MxbaiRerankV2(RERANK_MODEL)
 
 def resolve_ids_to_paths(ids: List[int], mapping: Dict[int, str]) -> List[str]:
     """

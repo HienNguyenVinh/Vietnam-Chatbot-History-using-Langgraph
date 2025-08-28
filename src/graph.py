@@ -219,7 +219,7 @@ async def reflect(state: AgentState):
         {"role": "user", "content": f"Câu hỏi: {query}\nTrả lời: {answer}"}
     ]
     results = cast(Eval, await llm_model.with_structured_output(Eval).ainvoke(messages))
-    print(f"hello: {results}")
+    logging.info(f"REFLECTION RESULTS: {results}")
     return results
 
 
@@ -258,22 +258,18 @@ def event_loop(state: AgentState) -> str:
     
     logging.info(f"Event loop: Iteration {num_iterations}, Eval: {current_eval}")
     
-    # End conditions
     if num_iterations >= MAX_ITERATOR:
         logging.info(f"Max iterations ({MAX_ITERATOR}) reached. Ending.")
         return END
     
     if current_eval == "good":
         logging.info("Answer quality is good. Ending.")
-        state["current_chat"].append({"role": "assistant", "content": state["final_answer"]})
         return END
     
     if current_eval == "bad":
         logging.info("Answer needs improvement. Retrying...")
-        # Return to appropriate search based on query type
         return "search_history"
     
-    # Default fallback
     logging.warning(f"Unexpected eval value: {current_eval}. Ending.")
     return END
 
@@ -293,7 +289,6 @@ async def init_graph():
     builder.add_edge("search_history", "history_response")
     builder.add_edge("history_response", "reflect")
     builder.add_edge("chitchat_response", END)
-
 
     builder.add_conditional_edges("classify", router_query)
     builder.add_conditional_edges("reflect", event_loop)

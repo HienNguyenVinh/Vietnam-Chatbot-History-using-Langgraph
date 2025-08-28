@@ -37,12 +37,12 @@ def load_conversation_sync_from_worker(worker, thread_id, timeout=5):
         if hasattr(graph_obj, "get_state"):
             try:
                 state = graph_obj.get_state(config={'configurable': {'thread_id': thread_id}})
-                return state.values.get('messages', [])
+                return state.values.get('current_chat', [])
             except Exception:
                 pass
         if hasattr(graph_obj, "get_state"):
             fut = worker.run_coro(graph_obj.get_state({'configurable': {'thread_id': thread_id}}))
-            return fut.result(timeout=timeout).values.get('messages', [])
+            return fut.result(timeout=timeout).values.get('current_chat', [])
     except FutureTimeout:
         return []
     except Exception:
@@ -115,7 +115,7 @@ if 'chat_threads' not in st.session_state:
 add_thread(st.session_state['thread_id'])
 
 # --------------------------- Sidebar UI ---------------------------
-st.sidebar.title('LangGraph Chatbot')
+st.sidebar.title('Chatbot tra cứu lịch sử Việt Nam')
 
 if st.sidebar.button('New Chat'):
     reset_chat()
@@ -130,13 +130,14 @@ for thread_id in st.session_state['chat_threads'][::-1]:
         st.session_state['thread_id'] = thread_id
         messages = load_conversation_sync_from_worker(worker, thread_id)
 
-        temp_messages = []
-        for msg in messages:
-            if isinstance(msg, HumanMessage):
-                role = 'user'
-            else:
-                role = 'assistant'
-            temp_messages.append({'role': role, 'content': getattr(msg, "content", str(msg))})
+        temp_messages = messages
+        # temp_messages = []
+        # for msg in messages:
+        #     if isinstance(msg, HumanMessage):
+        #         role = 'user'
+        #     else:
+        #         role = 'assistant'
+        #     temp_messages.append({'role': role, 'content': getattr(msg, "content", str(msg))})
 
         st.session_state['message_history'] = temp_messages
 
@@ -163,7 +164,10 @@ for thread_id in st.session_state['chat_threads'][::-1]:
 # --------------------------- Main UI ---------------------------
 for message in st.session_state['message_history']:
     with st.chat_message(message['role']):
-        st.text(message['content'])
+        if message['role'] == 'assistant':
+            st.markdown(message['content'])
+        else:
+            st.text(message['content'])
 
 user_input = st.chat_input('Type here')
 
@@ -210,6 +214,6 @@ if user_input:
                 break
 
             accumulated += chunk
-            container.text(accumulated)
+            container.markdown(accumulated)
 
     st.session_state['message_history'].append({'role': 'assistant', 'content': accumulated})
