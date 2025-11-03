@@ -43,27 +43,40 @@ def fix_text(input_path):
         full_text = f.read()
     
     lines = full_text.splitlines()
+    def is_citation(line: str) -> bool:
+        # hoặc nếu chứa các từ khóa xuất bản/chú thích phổ biến
+        if re.search(r'\bNxb\.|\btr\.|\bSđd|\btờ\.|\bQ\.', line, flags=re.IGNORECASE):
+            return True
+        # hoặc nếu chỉ gồm dấu sao và whitespace
+        if re.fullmatch(r'[\*\s\.,;:/&quot;]+', line):
+            return True
+        return False
 
+    filtered_lines = [ln for ln in lines if not is_citation(ln)]
     cleaned = []
-    for line in lines:
+    for line in filtered_lines:
         # bỏ dòng chỉ toàn số (ví dụ "19\n")
         if re.match(r'^\s*\d+\s*$', line):
             continue
         # bỏ dòng là tiêu đề cố định
-        if 'LỊCH SỬ VIỆT NAM - TẬP 3' in line:
+        if 'LỊCH SỬ VIỆT NAM - TẬP 7 ' in line:
             continue
         cleaned.append(line.strip())
     full_text = "\n".join(cleaned)
 
     fixed = re.sub(r'\n{3,}', '\n\n', full_text)         
-    fixed = re.sub(r'(?<![.?!])\n+', ' ', fixed)       
-    fixed = re.sub(r'\n+', '\n\n', fixed)
-    fixed = re.sub(r'LỊCH SỬ VIỆT NAM - TẬP 3', '', fixed)  
+    # fixed = re.sub(r'(?<![.?!])\n+', ' ', fixed)       
+    # fixed = re.sub(r'\n+', '\n\n', fixed)
+    fixed = re.sub(r'LỊCH SỬ VIỆT NAM - TẬP 7', '', fixed)  
 
-    output_dir = "preprocessed_text"
-    output_file = os.path.join(output_dir, f"text_tap_3.txt")
+    output_dir = "preprocessed_text\\text_tap_7.txt"
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "text_tap_7.txt")
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(fixed)
+
+if __name__ == "__main__":
+    fix_text(r'C:\Users\admin\OneDrive\Desktop\Project_Intern_MISA\db_helper\preprocessed_text\Lich_Su_Chung\preprocessed_tap_7.txt')
 
 def preprocess_txt(input_path: str) -> str:
     # 1) Đọc nguyên file
@@ -115,11 +128,11 @@ def save_preprocessed(input_path: str, output_dir: str = "preprocessed_text") ->
         f.write(result)
     return out_path
 
-if __name__ == "__main__":
-    for n in [1]:
-        input_file = f"preprocessed_text\\ChinhTri\\LichSuDang.txt"
-        out_file = save_preprocessed(input_file)
-        print(f"Đã lưu file tiền xử lý tại: {out_file}")
+# if __name__ == "__main__":
+#     for n in [1]:
+#         input_file = f"preprocessed_text\\ChinhTri\\LichSuDang.txt"
+#         out_file = save_preprocessed(input_file)
+#         print(f"Đã lưu file tiền xử lý tại: {out_file}")
     
 
     # print("starting...")
