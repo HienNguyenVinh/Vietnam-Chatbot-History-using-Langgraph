@@ -11,7 +11,8 @@ wheels/
 .env
 env
 db_helper/chroma_db
-requirements_2.txt
+db_helper/embedding_model
+embedding_model
 log.txt
 chroma_db
 .idea/

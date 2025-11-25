@@ -8,15 +8,12 @@ class InputState(TypedDict):
 
 class AgentState(InputState):
     user_input: Optional[str] = None
-    query_type: Literal["history", "chitchat"] = None
+    user_id: Optional[str] = None
 
     retrieved_documents: List[Any] = field(default_factory=list)
     web_search_results : Optional[str] = None
 
     current_chat: List[Dict[str, str]] = field(default_factory=list)
-    final_answer: Optional[str] = None
-    reflect_result: Optional[str] = None
-    eval: Literal["good", "bad"] = "bad"
-    eval_history: List[Any] = field(default_factory=list)
+    
 
     
