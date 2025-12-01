@@ -1,7 +1,7 @@
 import asyncio
 from typing import Optional, List
 from langchain_community.retrievers import BM25Retriever
-from langchain.schema import Document
+from langchain_core.documents import Document
 import chromadb
 from ..utils.utils import config
 

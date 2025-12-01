@@ -1,13 +1,14 @@
 retriever:
-  embedding_model: Qwen/Qwen3-Embedding-0.6B
+  embedding_model: google/embeddinggemma-300M
+  cached_embedding_path: embedding_model
   collection_name: viet_history
-  db_path: db_helper/chroma_db
+  db_path: chroma_db
   top_k: 5
   rerank_model: mixedbread-ai/mxbai-rerank-base-v2
-  generate_query_model: gemini-2.0-flash-lite
 reflection:
   max_iterator: 3
 llm:
   gemini: gemini-2.0-flash
   groq: openai/gpt-oss-120b
   temperature: 0
+  grader_model: gemini-2.0-flash-lite

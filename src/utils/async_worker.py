@@ -59,14 +59,14 @@ class AsyncWorker:
             raise RuntimeError("Worker loop not started")
         return asyncio.run_coroutine_threadsafe(coro, self._loop)
 
-    def start_astream_task(self, input_obj, config, out_queue):
+    def start_astream_task(self, input_obj, out_queue):
         """Start a coroutine in worker loop to consume graph.astream and push chunks to out_queue."""
         if self._graph is None:
             raise RuntimeError("Graph not initialized in worker")
 
         async def _consume():
             try:
-                async for event in self._graph.astream(input_obj, config=config, stream_mode="messages"):
+                async for event in self._graph.astream(input_obj, stream_mode="messages"):
                     try:
                         text = event[0].content
                     except Exception:

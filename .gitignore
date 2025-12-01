@@ -10,8 +10,7 @@ wheels/
 .venv
 .env
 env
-db_helper/chroma_db
-requirements_2.txt
+embedding_model
 log.txt
 chroma_db
 .idea/
