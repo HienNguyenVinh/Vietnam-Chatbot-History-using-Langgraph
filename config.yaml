@@ -1,8 +1,8 @@
 retriever:
   embedding_model: google/embeddinggemma-300M
-  cached_embedding_path: db_helper/embedding_model
+  cached_embedding_path: embedding_model
   collection_name: viet_history
-  db_path: db_helper/chroma_db
+  db_path: chroma_db
   top_k: 5
   rerank_model: mixedbread-ai/mxbai-rerank-base-v2
 reflection:

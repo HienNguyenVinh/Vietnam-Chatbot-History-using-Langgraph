@@ -57,7 +57,8 @@ async def rag(query: str) -> List[Any]:
     docs = results["retrieved_documents"]
 
     logger.info(f"Finish retrieval... Got {len(docs)} docs")
-    return results
+    # print(results)
+    return {"retrieved_documents": docs}
 
 async def generate_query_or_respond(state: AgentState):
     """Call the model to generate a response based on the current state. Given
@@ -89,8 +90,9 @@ async def grade_documents(
     """Determine whether the retrieved documents are relevant to the question."""
     logger.info("Start  grading...")
     question = state["messages"][0].content
+    # print(state)
     context = state["messages"][-1].content
-    print(context)
+    state["retrieved_documents"] = context
 
     prompt = GRADE_PROMPT.format(question=question, context=context)
     response = (
@@ -125,9 +127,9 @@ async def generate_answer(state: AgentState) -> Dict[str, str]:
         Dict[str, str]: A dictionary with key 'final_answer' whose value is the model's reply.
     """
     logger.info("Start generate answer...")
+    print(state)
     prompt = HISTORY_RESPONSE_SYSTEM_PROMPT.format(
-        # documents = _format_documents(state["retrieved_documents"])
-        documents = state["retrieved_documents"]
+        documents = state["messages"][-1].content
     )
     messages = [
         {"role": "system", "content": prompt},

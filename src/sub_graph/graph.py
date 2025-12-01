@@ -3,7 +3,7 @@ from chromadb import PersistentClient
 from sentence_transformers import SentenceTransformer
 from langgraph.graph import START, END, StateGraph
 from langchain_core.documents import Document
-from mxbai_rerank import MxbaiRerankV2
+# from mxbai_rerank import MxbaiRerankV2
 import asyncio
 import logging
 import json
@@ -41,7 +41,7 @@ async def init_model():
                                   device='cpu',
                                   cache_folder=EMBEDDING_MODEL_PATH,
                                   trust_remote_code=True)
-    rerank_model = MxbaiRerankV2(RERANK_MODEL)
+    # rerank_model = MxbaiRerankV2(RERANK_MODEL)
 
 async def vector_search(query: str) -> List[Document]:
     client = PersistentClient(path=DB_PATH)
@@ -124,9 +124,9 @@ async def hybrid_search(state: State) -> Dict[Any, Any]:
             combined.append(doc)
             seen.add(text)
     logger.info(f"Hybrid search got {len(combined)} docs")
-    return {"retrieved_documents": combined}
+    return {"retrieved_documents": _format_documents(combined)}
 
-def _format_documents(documents: List[Document]) -> str:
+def _format_documents(documents: List[Document]) -> List[str]:
     formatted = []
 
     for doc in documents:
@@ -139,30 +139,31 @@ def _format_documents(documents: List[Document]) -> str:
 
     return formatted
 
-async def rerank(state: State) -> Dict[str, List[any]]:
-    logger.info("___start reranking...")
-    global rerank_model
-    # model = MxbaiRerankV2(RERANK_MODEL)
-    query = state.user_query
-    documents = _format_documents(state.retrieved_documents)
+# async def rerank(state: State) -> Dict[str, List[any]]:
+#     logger.info("___start reranking...")
+#     global rerank_model
+#     # model = MxbaiRerankV2(RERANK_MODEL)
+#     query = state.user_query
+#     documents = _format_documents(state.retrieved_documents)
 
-    try: 
-        results = rerank_model.rerank(query, documents, return_documents=True, top_k=TOP_K)
-    except Exception as e:
-        logger.error(f"ERROR while reranking: {e}")
-        results = state.retrieved_documents
+#     try: 
+#         results = rerank_model.rank(query, documents, return_documents=True, top_k=TOP_K)
+#     except Exception as e:
+#         logger.error(f"ERROR while reranking: {e}")
+#         results = state.retrieved_documents
 
-    logger.info("___finished reranking...")
-    print(results)
-    return {"retrieved_documents": results}
+#     logger.info("___finished reranking...")
+#     print(results)
+#     return {"retrieved_documents": results}
 
 builder = StateGraph(State)
 
 builder.add_node("hybrid_search", hybrid_search)
-builder.add_node("rerank", rerank)
+# builder.add_node("rerank", rerank)
 
 builder.add_edge(START, "hybrid_search")
-builder.add_edge("hybrid_search", "rerank")
-builder.add_edge("rerank", END)
+# builder.add_edge("hybrid_search", "rerank")
+# builder.add_edge("rerank", END)
+builder.add_edge("hybrid_search", END)
 
 graph = builder.compile()

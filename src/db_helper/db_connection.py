@@ -3,7 +3,6 @@ import dotenv
 import psycopg
 from psycopg.rows import dict_row
 
-
 dotenv.load_dotenv()
 
 db_name = os.getenv("DB_NAME")
