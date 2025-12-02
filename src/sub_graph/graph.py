@@ -8,6 +8,7 @@ import asyncio
 import logging
 import json
 from dotenv import load_dotenv
+import os
 
 from ..utils.utils import config
 from .states import State
@@ -37,6 +38,9 @@ logger = logging.getLogger(__name__)
 async def init_model():
     global embed_model, rerank_model
     logger.info("Init embedding model and rerank model!")
+
+    os.makedirs(EMBEDDING_MODEL_PATH, exist_ok=True)
+
     embed_model = SentenceTransformer(EMBEDDING_MODEL,
                                   device='cpu',
                                   cache_folder=EMBEDDING_MODEL_PATH,

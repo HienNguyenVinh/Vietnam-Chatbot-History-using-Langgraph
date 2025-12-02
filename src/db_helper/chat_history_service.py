@@ -105,7 +105,7 @@ def format_chat_history(chat_history: List[Dict]) -> Optional[List]:
         for message in reversed(chat_history):
             formatted_history.append({"role": "user",
                                       "content": message["user_question"]})
-            formatted_history.append({"role": "model",
+            formatted_history.append({"role": "assistant",
                                       "content": message["bot_answer"]})
     else:
         return []

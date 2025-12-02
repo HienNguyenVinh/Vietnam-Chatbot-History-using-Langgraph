@@ -7,13 +7,10 @@ class InputState(TypedDict):
     messages: Annotated[List[AnyMessage], add_messages]
 
 class AgentState(InputState):
-    user_input: Optional[str] = None
+    user_query: Optional[str] = None
     user_id: Optional[str] = None
 
-    retrieved_documents: List[Any] = field(default_factory=list)
-    web_search_results : Optional[str] = None
-
-    current_chat: List[Dict[str, str]] = field(default_factory=list)
+    retrieved_documents: Optional[List[Any]] = None
     
 
     
