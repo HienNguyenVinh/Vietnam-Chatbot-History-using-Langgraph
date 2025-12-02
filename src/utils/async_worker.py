@@ -1,6 +1,7 @@
 import traceback
 import threading
 import asyncio
+from langchain_core.messages import ToolMessage, AIMessageChunk
 
 class AsyncWorker:
     def __init__(self):
@@ -59,19 +60,37 @@ class AsyncWorker:
             raise RuntimeError("Worker loop not started")
         return asyncio.run_coroutine_threadsafe(coro, self._loop)
 
-    def start_astream_task(self, input_obj, out_queue):
+    def start_astream_task(self, messages, out_queue, config):
         """Start a coroutine in worker loop to consume graph.astream and push chunks to out_queue."""
         if self._graph is None:
             raise RuntimeError("Graph not initialized in worker")
 
         async def _consume():
             try:
-                async for event in self._graph.astream(input_obj, stream_mode="messages"):
+                async for event in self._graph.astream(messages, 
+                                                       config=config, 
+                                                       stream_mode="messages"):
+                    # print(event)
                     try:
-                        text = event[0].content
-                    except Exception:
+                        message, metadata = event
+                        
+                        if not isinstance(message, AIMessageChunk):
+                            continue
+                            
+                        if metadata.get("langgraph_node") not in ["generate_query_or_respond", "generate_answer"]:
+                            continue
+
+                        text = message.content
+                    # try:
+                    #     text = event[0].content
+
+                    except Exception as e:
                         text = str(event)
-                    out_queue.put(text)
+                        print(f"Error parsing event: {e}")
+                    
+                    if text:
+                        out_queue.put(text)
+                        
             except Exception as e:
                 out_queue.put(f"[STREAM ERROR] {e}")
                 traceback.print_exc()

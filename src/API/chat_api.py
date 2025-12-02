@@ -49,13 +49,16 @@ async def text_generator(query_text: str, thread_id: str, user_id: str) -> Async
     raw_history = await get_chat_history(thread_id, user_id)
     formatted_history = format_chat_history(raw_history)
     messages = formatted_history + [{"role": "user", "content": query_text}]
+    
+    config = {"configurable": {"thread_id": thread_id}}
 
     q: sync_queue.Queue = sync_queue.Queue()
 
     try:
         future = worker.start_astream_task(
             {"messages": messages},
-            q
+            q,
+            config
         )
     except Exception as e:
         yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
