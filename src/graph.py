@@ -38,18 +38,19 @@ web_search_tool = TavilySearch(tavily_api_key=TAVILY_API_KEY,
 
 
 @tool
-async def rag(query: str) -> List[Any]:
+async def rag(query: str, source: list[str]) -> List[Any]:
     """
     Retrieve relevant Vietnam history documents from the vector database using semantic search.
 
     Args:
         query: Text query to embed and search for.
+        source: List of documents in which the user wants to search for information.
 
     Returns:
         A list of Document objects containing page content, metadata, and distance scores.
     """
     logger.info(f"Start Retrieval...")
-    results = await rag_graph.ainvoke({"user_query": query})
+    results = await rag_graph.ainvoke({"user_query": query, "source": source})
     docs = results["retrieved_documents"]
 
     logger.info(f"Finish retrieval... Got {len(docs)} docs")

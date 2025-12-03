@@ -2,7 +2,7 @@ import json
 import logging
 import asyncio
 import queue as sync_queue
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, List
 
 from fastapi import APIRouter, HTTPException, Body, Query as FastAPIQuery
 from fastapi.responses import StreamingResponse
@@ -32,6 +32,7 @@ class ChatQuery(BaseModel):
     thread_id: str
     user_id: int
     config: Optional[dict] = {}
+    source: List[str]
 
 class ThreadCreate(BaseModel):
     user_id: int
@@ -42,13 +43,14 @@ def sse_event(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-async def text_generator(query_text: str, thread_id: str, user_id: str) -> AsyncGenerator[str, None]:
+async def text_generator(query_text: str, thread_id: str, user_id: str, source: List[str]=[]) -> AsyncGenerator[str, None]:
     if worker.graph is None:
         raise HTTPException(status_code=500, detail="Graph not initialized")
 
     raw_history = await get_chat_history(thread_id, user_id)
     formatted_history = format_chat_history(raw_history)
-    messages = formatted_history + [{"role": "user", "content": query_text}]
+    query = query_text + "\n" + ", ".join(source)
+    messages = formatted_history + [{"role": "user", "content": query}]
     
     config = {"configurable": {"thread_id": thread_id}}
 
@@ -134,6 +136,6 @@ async def get_stream_answer(query: ChatQuery):
         raise HTTPException(status_code=500, detail="Graph not initialized")
 
     return StreamingResponse(
-        text_generator(query.query, query.thread_id, query.user_id),
+        text_generator(query.query, query.thread_id, query.user_id, query.source),
         media_type="text/event-stream",
     )
