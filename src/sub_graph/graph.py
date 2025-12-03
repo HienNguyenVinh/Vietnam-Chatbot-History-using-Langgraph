@@ -47,7 +47,7 @@ async def init_model():
                                   trust_remote_code=True)
     # rerank_model = MxbaiRerankV2(RERANK_MODEL)
 
-async def vector_search(query: str) -> List[Document]:
+async def vector_search(query: str, source: list[str]=None) -> List[Document]:
     client = PersistentClient(path=DB_PATH)
     try:
         collection = client.get_collection(COLLECTION_NAME)
@@ -58,10 +58,17 @@ async def vector_search(query: str) -> List[Document]:
                                        convert_to_numpy=True,
                                        prompt_name="Retrieval-query")
         include = ["metadatas", "documents", "distances"]
-
+        if source:
+            where = {
+                "file":{"$in": source}
+            }
+        else:
+            where = None
+            
         results = collection.query(
             query_embeddings=[embedding.tolist()],
             n_results=TOP_K,
+            where=where,
             include=include
         )
 
@@ -93,7 +100,9 @@ async def vector_search(query: str) -> List[Document]:
         except Exception:
             pass
 
-async def bm25_search(bm25_search_keyword: str) -> List[Document]:
+async def bm25_search(bm25_search_keyword: str, source: list[str]) -> List[Document]:
+    if source:
+        return []
     bm25_retriever = await get_bm25()
     
     return await bm25_retriever.ainvoke(bm25_search_keyword)
@@ -102,8 +111,8 @@ async def hybrid_search(state: State) -> Dict[Any, Any]:
     logger.info("___start searching...")
 
     results = await asyncio.gather(
-        vector_search(state.user_query),
-        bm25_search(state.user_query),
+        vector_search(state.user_query, state.source),
+        bm25_search(state.user_query, state.source),
         return_exceptions=True
     )
     logger.info("___finished searching...")
