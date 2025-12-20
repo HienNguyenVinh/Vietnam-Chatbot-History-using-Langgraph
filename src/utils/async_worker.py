@@ -1,7 +1,7 @@
 import traceback
 import threading
 import asyncio
-from langchain_core.messages import ToolMessage, AIMessageChunk
+from langchain_core.messages import AIMessageChunk
 
 class AsyncWorker:
     def __init__(self):
@@ -11,7 +11,6 @@ class AsyncWorker:
         self._graph = None
 
     def start(self, init_graph_coroutine, init_timeout=300):
-        """Start worker thread and initialize graph via init_graph_coroutine (async callable)."""
         if self._thread and self._thread.is_alive():
             return
 
@@ -55,13 +54,11 @@ class AsyncWorker:
         return self._graph
 
     def run_coro(self, coro):
-        """Schedule coroutine on worker loop and return concurrent.futures.Future"""
         if not self._loop:
             raise RuntimeError("Worker loop not started")
         return asyncio.run_coroutine_threadsafe(coro, self._loop)
 
     def start_astream_task(self, messages, out_queue, config):
-        """Start a coroutine in worker loop to consume graph.astream and push chunks to out_queue."""
         if self._graph is None:
             raise RuntimeError("Graph not initialized in worker")
 
@@ -98,73 +95,3 @@ class AsyncWorker:
                 out_queue.put(None)
 
         return self.run_coro(_consume())
-    
-    async def _delete_thread_coro(self, thread_id: str) -> bool:
-        """
-        Coroutine that runs on worker loop to delete all checkpoints for given thread_id.
-        Returns True on success, False on failure.
-        """
-        if self._graph is None:
-            return False
-        cp = getattr(self._graph, "checkpointer", None)
-        if cp is None:
-            return False
-
-        try:
-            if hasattr(cp, "adelete_thread") and asyncio.iscoroutinefunction(getattr(cp, "adelete_thread")):
-                await cp.adelete_thread(thread_id)
-                return True
-        except Exception:
-            traceback.print_exc()
-
-        try:
-            if hasattr(cp, "delete_thread"):
-                maybe = getattr(cp, "delete_thread")
-                if asyncio.iscoroutinefunction(maybe):
-                    await maybe(thread_id)
-                else:
-                    maybe(thread_id)
-                return True
-        except Exception:
-            traceback.print_exc()
-
-        try:
-            checkpoints = None
-            if hasattr(cp, "alist") and asyncio.iscoroutinefunction(getattr(cp, "alist")):
-                checkpoints = await cp.alist(None)
-            elif hasattr(cp, "list"):
-                checkpoints = cp.list(None)
-            else:
-                checkpoints = []
-
-            to_delete = []
-            for ck in checkpoints or []:
-                cfg = getattr(ck, "config", None) or (ck.get("config") if isinstance(ck, dict) else {})
-                if cfg and cfg.get("configurable", {}).get("thread_id") == thread_id:
-                    # try to get id
-                    ck_id = getattr(ck, "id", None) or (ck.get("id") if isinstance(ck, dict) else None)
-                    if ck_id:
-                        to_delete.append(ck_id)
-
-            for ckid in to_delete:
-                if hasattr(cp, "adelete") and asyncio.iscoroutinefunction(getattr(cp, "adelete")):
-                    await cp.adelete(ckid)
-                elif hasattr(cp, "delete"):
-                    maybe = getattr(cp, "delete")
-                    if asyncio.iscoroutinefunction(maybe):
-                        await maybe(ckid)
-                    else:
-                        maybe(ckid)
-            return True
-        except Exception:
-            traceback.print_exc()
-            return False
-
-    def delete_thread(self, thread_id: str):
-        """
-        Schedule deletion coroutine on worker loop.
-        Returns concurrent.futures.Future which yields True/False.
-        """
-        if not self._loop:
-            raise RuntimeError("Worker loop not started")
-        return asyncio.run_coroutine_threadsafe(self._delete_thread_coro(thread_id), self._loop)

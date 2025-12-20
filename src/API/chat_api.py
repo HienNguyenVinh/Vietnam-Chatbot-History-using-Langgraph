@@ -39,7 +39,6 @@ class ThreadCreate(BaseModel):
 
 
 def sse_event(data: dict) -> str:
-    """Return a Server-Sent Event (SSE) formatted string for given dict payload."""
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
