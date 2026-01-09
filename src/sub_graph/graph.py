@@ -50,7 +50,7 @@ async def init_model():
 async def vector_search(query: str, source: list[str]=None) -> List[Document]:
     client = PersistentClient(path=DB_PATH)
     try:
-        collection = client.get_collection(name=COLLECTION_NAME,
+        collection = client.get_or_create_collection(name=COLLECTION_NAME,
                                            configuration={"hnsw": {"space": "cosine"}})
         global embed_model
         # model = SentenceTransformer(EMBEDDING_MODEL)

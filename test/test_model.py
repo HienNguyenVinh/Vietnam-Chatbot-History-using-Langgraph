@@ -75,8 +75,6 @@ async def evaluate_agent(csv_path: str, graph, *,
         df["Agent"] = ""
     if "Correct" not in df.columns:
         df["Correct"] = False
-    if "AgentRaw" not in df.columns:
-        df["AgentRaw"] = ""
 
     total = len(df)
     logger.info("Loaded %d rows from %s", total, csv_path)

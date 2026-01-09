@@ -99,6 +99,7 @@ async def grade_documents(state: AgentState) -> Literal["generate_answer", "web_
     )
 
     score = response.binary_score
+    # score = "yes"
     logger.info(f"Finish grading... res={score}")
 
     if score == "yes":
@@ -108,7 +109,8 @@ async def grade_documents(state: AgentState) -> Literal["generate_answer", "web_
 
 async def web_search(state: AgentState) -> dict[str: List[Any]]:
     logger.info("Start searching web...")
-    results = await web_search_tool.ainvoke({"query": state["messages"][0].content})
+    # print(query = state["user_query"])
+    results = await web_search_tool.ainvoke({"query": state["user_query"]})
     logger.info(f"Finish searching web... Got {len(results)} docs")
     # print(results)
 
